@@ -9,7 +9,6 @@ local.properties
 app/build/
 # ---- 发布签名(严禁提交) ----
 keystore.properties
-easytier-release*
 *.jks
 *.keystore
 nanokvm-release.keystore
