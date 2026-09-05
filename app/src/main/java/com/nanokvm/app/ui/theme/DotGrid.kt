@@ -1,6 +1,7 @@
 package com.nanokvm.app.ui.theme
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -19,8 +20,8 @@ import com.nanokvm.app.ui.theme.OneKvmColors
 fun DotGridBackground(
     modifier: Modifier = Modifier,
     step: Dp = 20.dp,
-    dotColor: Color = OneKvmColors.LightMutedForeground,
-    background: Color = OneKvmColors.LightSurface,
+    dotColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    background: Color = MaterialTheme.colorScheme.surfaceVariant,
 ) {
     val stepPx = step.value * LocalDensity.current.density
     Canvas(modifier = modifier) {

@@ -30,6 +30,8 @@ fun AppNav(
             val vm: ConnectViewModel = viewModel(factory = ConnectViewModel.factory(settingsStore))
             ConnectScreen(
                 viewModel = vm,
+                isDark = isDark,
+                onToggleTheme = onToggleTheme,
                 onConnected = { _, _, _ ->
                     navController.navigate("console") { launchSingleTop = true }
                 },

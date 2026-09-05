@@ -155,6 +155,12 @@ private fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // 左侧状态组放在“weight 容器”内(weight 之后的兄弟行内件在本机不渲染,见双栏同源坑)
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         // 画面:分辨率;分阶段给可扫读文案与状态色
         val picValue = when {
             state.phase == Phase.ERROR -> "无画面"
@@ -203,7 +209,14 @@ private fun TopBar(
             tone = StatusTone.Ok,
             modifier = Modifier.height(28.dp),
         )
-        Spacer(modifier = Modifier.weight(1f))
+        }
+        IconButton(onClick = onToggleTheme, modifier = Modifier.size(32.dp)) {
+            Icon(
+                if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                contentDescription = if (isDark) "切换浅色" else "切换深色",
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Outlined.MoreVert, contentDescription = "菜单")
@@ -217,12 +230,6 @@ private fun TopBar(
                 DropdownMenuItem(
                     text = { Text("返回") },
                     onClick = { menuOpen = false; onBack() },
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                DropdownMenuItem(
-                    text = { Text(if (isDark) "浅色主题" else "深色主题") },
-                    leadingIcon = { Icon(if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode, null) },
-                    onClick = { menuOpen = false; onToggleTheme() },
                 )
             }
         }

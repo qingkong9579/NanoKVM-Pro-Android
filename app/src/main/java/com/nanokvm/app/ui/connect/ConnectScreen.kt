@@ -11,18 +11,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +62,8 @@ import com.nanokvm.app.ui.theme.OneKvmColors
 @Composable
 fun ConnectScreen(
     viewModel: ConnectViewModel,
+    isDark: Boolean,
+    onToggleTheme: () -> Unit,
     onConnected: (host: String, user: String, pass: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -70,6 +76,20 @@ fun ConnectScreen(
             .padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
+        // 右上角日夜切换(全局主题开关入口)
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(4.dp),
+        ) {
+            IconButton(onClick = onToggleTheme) {
+                Icon(
+                    if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                    contentDescription = if (isDark) "切换浅色" else "切换深色",
+                )
+            }
+        }
         DotGridBackground(Modifier.fillMaxSize())
         Column(
             modifier = Modifier
