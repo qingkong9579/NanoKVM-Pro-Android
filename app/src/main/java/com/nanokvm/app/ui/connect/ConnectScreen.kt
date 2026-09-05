@@ -76,7 +76,8 @@ fun ConnectScreen(
             .padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // 右上角日夜切换(全局主题开关入口)
+        DotGridBackground(Modifier.fillMaxSize())
+        // 右上角日夜切换(全局主题开关入口,置于底纹之上)
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -87,10 +88,10 @@ fun ConnectScreen(
                 Icon(
                     if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
                     contentDescription = if (isDark) "切换浅色" else "切换深色",
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
-        DotGridBackground(Modifier.fillMaxSize())
         Column(
             modifier = Modifier
                 .widthIn(max = 480.dp)
