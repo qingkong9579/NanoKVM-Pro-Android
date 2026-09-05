@@ -12,3 +12,4 @@ keystore.properties
 easytier-release*
 *.jks
 *.keystore
+nanokvm-release.keystore
