@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="./xterm.css">
+<style>
+  html, body { height: 100%; margin: 0; background: #101418; }
+  #term { height: 100%; padding: 4px; box-sizing: border-box; }
+  .xterm { height: 100%; }
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="./xterm.js"></script>
+<script>
+var term = new Terminal({
+  cursorBlink: true,
+  fontSize: 13,
+  fontFamily: 'monospace',
+  theme: { background: '#101418', foreground: '#d7dae0', cursor: '#45e07a', selectionBackground: '#3b82f6' },
+  scrollback: 5000
+});
+term.open(document.getElementById('term'));
+
+var decoder = new TextDecoder('utf-8');
+function pushBase64(b64) {
+  try {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    term.write(decoder.decode(bytes, { stream: true }));
+  } catch (e) { /* ignore frame */ }
+}
+
+term.onData(function (d) {
+  if (window.Android) Android.onData(d);
+});
+
+function grabFocus() {
+  try {
+    if (term.textarea && document.activeElement !== term.textarea) term.textarea.focus();
+  } catch (e) { }
+  if (window.Android) Android.showIme();
+}
+document.addEventListener('pointerdown', function () { setTimeout(grabFocus, 0); });
+window.addEventListener('keydown', function () { grabFocus(); });
+
+function measureCell() {
+  var probe = document.createElement('canvas').getContext('2d');
+  probe.font = '13px monospace';
+  return { w: probe.measureText('W').width, h: 16 };
+}
+
+function sendSize() {
+  var el = document.getElementById('term');
+  var cell = measureCell();
+  var cols = Math.max(10, Math.floor(el.clientWidth / cell.w));
+  var rows = Math.max(5, Math.floor(el.clientHeight / cell.h));
+  if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows);
+  if (window.Android) Android.onSize(term.rows, term.cols);
+}
+
+window.addEventListener('resize', function () { setTimeout(sendSize, 60); });
+
+function boot() {
+  var m1 = function () { setTimeout(sendSize, 150); };
+  var m2 = function () { setTimeout(sendSize, 500); };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { m1(); m2(); });
+  } else {
+    m1(); m2();
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+
+window.nanoTerm = { push: pushBase64, resize: sendSize };
+</script>
+</body>
+</html>

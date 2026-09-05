@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simple monochrome launcher icon (monitor + K), tinted by the app theme. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F0F11"
+        android:pathData="M24,24h60a6,6 0 0 1 6,6v40a6,6 0 0 1 -6,6h-26v8h10a3,3 0 0 1 0,6h-36a3,3 0 0 1 0,-6h10v-8h-26a6,6 0 0 1 -6,-6v-40a6,6 0 0 1 6,-6z" />
+    <path
+        android:fillColor="#45E07A"
+        android:pathData="M42,42v22h5v-9h10v9h5v-22h-5v8h-10v-8z" />
+</vector>
