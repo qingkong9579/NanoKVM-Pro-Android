@@ -14,8 +14,8 @@ android {
         applicationId = "com.nanokvm.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     signingConfigs {
@@ -66,6 +66,10 @@ android {
     }
 
     packaging {
+        jniLibs {
+            // 真机 arm64 上从 APK zip 直接 dlopen WebRTC .so 会 SIGTRAP(release 默认 extractNativeLibs=false)
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
