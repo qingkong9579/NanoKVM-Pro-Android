@@ -1,12 +1,14 @@
 package com.nanokvm.app.ui.theme
 
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.Typography
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
@@ -74,12 +76,17 @@ fun NanoKvmProTheme(
     darkTheme: Boolean,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = TypographyDefaults,
-        shapes = AppShapes,
-        content = content,
-    )
+    val colors = if (darkTheme) DarkColors else LightColors
+    // 页面根均为裸背景(无 Surface),LocalContentColor 默认黑 → 图标深色下不可见;
+    // 这里统一按主题提供内容色,所有未显式 tint 的 Icon 自动适配。
+    CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = TypographyDefaults,
+            shapes = AppShapes,
+            content = content,
+        )
+    }
 }
 
 // System default typography is fine; mirrored here for explicit override later.
