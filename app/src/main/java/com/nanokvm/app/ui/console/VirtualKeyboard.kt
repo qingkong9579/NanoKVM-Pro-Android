@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nanokvm.app.data.hid.HidKeymap
@@ -151,20 +153,24 @@ private fun RowScope.BoxHolder(
     onModifierToggle: (KKey.Mod) -> Unit,
     onAction: (ActionKind) -> Unit,
 ) {
+    // 键帽铺满整个按键格(等宽块状),命中区即整格;修饰键加粗区分。
     Box(
-        modifier = Modifier.weight(weight).pointerInput(key) {
-            when (key) {
-                is KKey.HID -> detectTapGestures(
-                    onPress = {
-                        onKeyDown(key)
-                        tryAwaitRelease()
-                        onKeyUp(key)
-                    },
-                )
-                is KKey.Mod -> detectTapGestures(onTap = { onModifierToggle(key) })
-                is KKey.Action -> detectTapGestures(onTap = { onAction(key.action) })
-            }
-        },
+        modifier = Modifier
+            .weight(weight)
+            .fillMaxWidth()
+            .pointerInput(key) {
+                when (key) {
+                    is KKey.HID -> detectTapGestures(
+                        onPress = {
+                            onKeyDown(key)
+                            tryAwaitRelease()
+                            onKeyUp(key)
+                        },
+                    )
+                    is KKey.Mod -> detectTapGestures(onTap = { onModifierToggle(key) })
+                    is KKey.Action -> detectTapGestures(onTap = { onAction(key.action) })
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -172,11 +178,18 @@ private fun RowScope.BoxHolder(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = if (key is KKey.Mod) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 14.sp,
+            // 长标签(F10/CLR)降一号字并收窄水平留白,避免等宽键帽下被裁剪。
+            fontSize = if (key.label.length > 2) 12.sp else 14.sp,
+            maxLines = 1,
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 6.dp, vertical = 9.dp),
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (key is KKey.Mod) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                )
+                .padding(horizontal = 2.dp, vertical = 10.dp),
+            textAlign = TextAlign.Center,
         )
     }
 }

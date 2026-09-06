@@ -71,6 +71,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -227,7 +228,7 @@ fun ConsoleToolsSheet(
                     subtitle = "组合键立即发送",
                 )
                 FlowRow(
-                    modifier = Modifier.padding(start = 36.dp, end = 4.dp),
+                    modifier = Modifier.padding(start = 44.dp, end = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -250,7 +251,7 @@ fun ConsoleToolsSheet(
                     title = "旋转",
                     subtitle = if (transformLocked) "仅直连可用(WebRTC 渲染层不支持)" else "仅改变本端显示",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("0°" to 0, "90°" to 90, "180°" to 180, "270°" to 270),
                         selected = state.videoRotation,
@@ -262,7 +263,7 @@ fun ConsoleToolsSheet(
                     title = "缩放",
                     subtitle = if (transformLocked) "仅直连可用(WebRTC 渲染层不支持)" else "本端画面缩放",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("50%" to 0.5f, "75%" to 0.75f, "100%" to 1f, "150%" to 1.5f, "200%" to 2f),
                         selected = state.videoScale,
@@ -274,7 +275,7 @@ fun ConsoleToolsSheet(
                     title = "码率",
                     subtitle = "修改后立即重建视频流生效",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("自动" to 0, "无损" to 10000, "高" to 5000, "中" to 3000, "低" to 1000),
                         selected = bitrateSel,
@@ -303,7 +304,7 @@ fun ConsoleToolsSheet(
                     title = "帧率",
                     subtitle = if (fpsSel == 0) "自动(源帧率)" else "$fpsSel fps",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("自动" to 0, "30" to 30, "60" to 60),
                         selected = fpsSel,
@@ -329,7 +330,7 @@ fun ConsoleToolsSheet(
                     title = "关键帧间隔 GOP",
                     subtitle = "每 $gopSel 帧一个关键帧",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("30" to 30, "50" to 50, "100" to 100, "200" to 200),
                         selected = gopSel,
@@ -355,7 +356,7 @@ fun ConsoleToolsSheet(
                     title = "鼠标模式",
                     subtitle = if (state.mouseMode == HidMouseMode.ABSOLUTE) "绝对模式(点哪指哪)" else "相对模式(拖动控制)",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("绝对" to HidMouseMode.ABSOLUTE, "相对" to HidMouseMode.RELATIVE),
                         selected = state.mouseMode,
@@ -367,7 +368,7 @@ fun ConsoleToolsSheet(
                     title = "滚轮方向",
                     subtitle = if (state.wheelDir > 0) "正常(下滚=向下)" else "反向",
                 )
-                Row(Modifier.padding(start = 36.dp, end = 4.dp)) {
+                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
                     SegmentedButtons(
                         options = listOf("正常" to 1, "反向" to -1),
                         selected = state.wheelDir,
@@ -596,21 +597,27 @@ private fun ToolRow(
             .then(
                 if (onClick != null) {
                     Modifier
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable(onClick = onClick)
-                        .defaultMinSize(minHeight = 48.dp)
                 } else {
                     Modifier
                 },
             )
+            .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
         if (icon != null) {
-            Icon(
-                icon,
-                null,
-                Modifier.size(20.dp),
-                tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // 图标底座:32dp 圆角浅色块,与 MiniStat 同语言;危险项染错误色。
+            val tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(tint.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, Modifier.size(18.dp), tint = tint)
+            }
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
@@ -634,9 +641,11 @@ private fun ActionChip(label: String, onClick: () -> Unit) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .defaultMinSize(minHeight = 32.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
     )
 }
 

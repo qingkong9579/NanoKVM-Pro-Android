@@ -218,14 +218,14 @@ private fun TopBar(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         StatusDot(state)
-        IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Outlined.Refresh, "重连", Modifier.size(18.dp))
+        IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Outlined.Refresh, "重连", Modifier.size(20.dp))
         }
-        IconButton(onClick = onSettings, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Outlined.Settings, "设置", Modifier.size(18.dp))
+        IconButton(onClick = onSettings, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Outlined.Settings, "设置", Modifier.size(20.dp))
         }
-        IconButton(onClick = onExit, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.AutoMirrored.Outlined.ExitToApp, "退出", Modifier.size(18.dp))
+        IconButton(onClick = onExit, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.AutoMirrored.Outlined.ExitToApp, "退出", Modifier.size(20.dp))
         }
     }
 }

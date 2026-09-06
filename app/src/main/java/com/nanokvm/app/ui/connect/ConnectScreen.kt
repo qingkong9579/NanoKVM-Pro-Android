@@ -1,6 +1,7 @@
 package com.nanokvm.app.ui.connect
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -70,10 +72,10 @@ fun ConnectScreen(
     val error = state.error
     val fieldsEnabled = !state.busy
 
+    // 点阵底纹必须铺满整屏(edge-to-edge 含系统栏):内边距只会内缩画布、
+    // 露出窗口底色形成四周一圈;呼吸边距改由卡片外层 padding 承担(对应 web 的 p-4)。
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         DotGridBackground(Modifier.fillMaxSize())
@@ -94,8 +96,11 @@ fun ConnectScreen(
         }
         Column(
             modifier = Modifier
+                .padding(16.dp)
                 .widthIn(max = 480.dp)
+                .shadow(2.dp, RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),

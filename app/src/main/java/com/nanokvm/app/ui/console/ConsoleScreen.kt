@@ -63,9 +63,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -111,6 +113,8 @@ fun ConsoleScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // 底色必须铺到状态栏后面:只 padding 不铺底,深色主题会露出白色窗口底
+            .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding(),
     ) {
         TopBar(state, isDark, onToggleTheme, onBack, viewModel)
@@ -210,16 +214,16 @@ private fun TopBar(
             modifier = Modifier.height(28.dp),
         )
         }
-        IconButton(onClick = onToggleTheme, modifier = Modifier.size(32.dp)) {
+        IconButton(onClick = onToggleTheme, modifier = Modifier.size(40.dp)) {
             Icon(
                 if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
                 contentDescription = if (isDark) "切换浅色" else "切换深色",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
         Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "菜单")
+            IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Outlined.MoreVert, contentDescription = "菜单", modifier = Modifier.size(20.dp))
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
@@ -293,7 +297,7 @@ private fun ActionIcon(
         modifier = Modifier.widthIn(min = 40.dp),
     ) {
         IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
-            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp))
         }
         Text(
             text = caption,
@@ -641,12 +645,11 @@ private fun StatsChip(text: String) {
 
 /**
  * uPlot-style sparkline — mirrors One-KVM's StatsSheet chart look: blue #3b82f6
- * 1.5px line over a 10% translucent fill, faint horizontal grid, muted axis-text
+ * 1.5px line over a translucent gradient fill, faint horizontal grid, muted axis-text
  * live value (the web's palette is identical for every chart, so all three curves
- * share it).
+ * share it). A glow dot on the newest sample marks the live edge.
  */
 private val OneKvmChartLine = Color(0xFF3B82F6)
-private val OneKvmChartFill = Color(0x1A3B82F6)   // rgba(59,130,246,0.10)
 private val OneKvmChartGrid = Color(0x1A94A3B8)   // rgba(148,163,184,0.10)
 private val OneKvmChartText = Color(0xFF94A3B8)
 
@@ -675,6 +678,12 @@ private fun Sparkline(label: String, values: List<Float>, fmt: (Float) -> String
         ) {
             val w = size.width
             val h = size.height
+            // Faint horizontal grid across the plot (uPlot y-axis splits, x off),
+            // under the series.
+            for (i in 1..3) {
+                val y = h * i / 4f
+                drawLine(OneKvmChartGrid, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+            }
             if (values.size >= 2) {
                 val maxV = values.maxOrNull() ?: 0f
                 val minV = values.minOrNull() ?: 0f
@@ -682,6 +691,8 @@ private fun Sparkline(label: String, values: List<Float>, fmt: (Float) -> String
                 val stepX = w / (values.size - 1)
                 val line = Path()
                 val area = Path()
+                var lastX = 0f
+                var lastY = 0f
                 values.forEachIndexed { i, v ->
                     val x = i * stepX
                     val y = h - 2f - ((v - minV) / span) * (h - 4f)
@@ -693,16 +704,27 @@ private fun Sparkline(label: String, values: List<Float>, fmt: (Float) -> String
                         line.lineTo(x, y)
                         area.lineTo(x, y)
                     }
+                    lastX = x
+                    lastY = y
                 }
                 area.lineTo(w, h)
                 area.close()
-                drawPath(area, OneKvmChartFill)
-                drawPath(line, OneKvmChartLine, style = Stroke(width = 1.5f))
-            }
-            // Faint horizontal grid across the plot (uPlot y-axis splits, x off).
-            for (i in 1..3) {
-                val y = h * i / 4f
-                drawLine(OneKvmChartGrid, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+                drawPath(
+                    area,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(OneKvmChartLine.copy(alpha = 0.22f), OneKvmChartLine.copy(alpha = 0.02f)),
+                        startY = 0f,
+                        endY = h,
+                    ),
+                )
+                drawPath(
+                    line,
+                    OneKvmChartLine,
+                    style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+                // Live edge: solid dot + faint halo on the newest sample.
+                drawCircle(OneKvmChartLine.copy(alpha = 0.25f), radius = 4.5f, center = Offset(lastX, lastY))
+                drawCircle(OneKvmChartLine, radius = 2.2f, center = Offset(lastX, lastY))
             }
         }
     }

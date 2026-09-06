@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Material3 slot mapping of the One-KVM OKLCH palette.
@@ -90,4 +91,12 @@ fun NanoKvmProTheme(
 }
 
 // System default typography is fine; mirrored here for explicit override later.
-private val TypographyDefaults: Typography = Typography()
+private val TypographyDefaults: Typography = Typography(
+    // 层级令牌(.workbench/spec.md):标题 15sp/500 · 正文 13sp/400 · 次要 12sp。
+    // titleSmall 14→15sp 收敛各处 `.copy(fontSize = 15.sp)` 的散补;bodyLarge 16→15
+    // 让输入框/默认正文回到紧凑控制台密度。
+    titleMedium = Typography().titleMedium.copy(fontSize = 15.sp),
+    titleSmall = Typography().titleSmall.copy(fontSize = 15.sp),
+    bodyLarge = Typography().bodyLarge.copy(fontSize = 15.sp),
+    bodyMedium = Typography().bodyMedium.copy(fontSize = 13.sp),
+)

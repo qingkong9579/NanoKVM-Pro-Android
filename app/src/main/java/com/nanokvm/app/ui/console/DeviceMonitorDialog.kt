@@ -29,9 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -87,7 +89,7 @@ fun DeviceMonitorDialog(rest: NanoKvmApi, onClose: () -> Unit) {
                     lastCpu = s
                     if (s.memTotalKb > 0) {
                         memPct = ((s.memTotalKb - s.memAvailKb).toFloat() / s.memTotalKb * 100f).coerceIn(0f, 100f)
-                        memText = String.format(Locale.US, "%.1f / %.1f GB", (s.memTotalKb - s.memAvailKb) / 1048576f, s.memTotalKb / 1048576f)
+                        memText = String.format(Locale.US, "%.1f/%.1fG", (s.memTotalKb - s.memAvailKb) / 1048576f, s.memTotalKb / 1048576f)
                     }
                     tempText = if (s.tempC.isNaN()) "—" else String.format(Locale.US, "%.0f °C", s.tempC)
                     loadText = if (s.load1.isNaN()) "—" else String.format(Locale.US, "%.2f", s.load1)
@@ -237,7 +239,7 @@ private fun MiniChart(
             val span = (maxV - minV).coerceAtLeast(0.001f)
             fun yOf(v: Float) = h - 1.5f - ((v - minV) / span) * (h - 3f)
 
-            // 细网格(画布四等分,与性能面板一致),无数据也显示
+            // 细网格(画布四等分,与性能面板一致),垫在曲线下方
             for (i in 1..3) {
                 val y = h * i / 4f
                 drawLine(OneKvmMonitorGrid, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
@@ -247,6 +249,8 @@ private fun MiniChart(
                 val stepX = w / (window - 1)
                 val line = Path()
                 val area = Path()
+                var lastX = 0f
+                var lastY = 0f
                 valid.forEachIndexed { i, v ->
                     val x = w - (valid.size - 1 - i) * stepX
                     val y = yOf(v)
@@ -258,11 +262,23 @@ private fun MiniChart(
                         line.lineTo(x, y)
                         area.lineTo(x, y)
                     }
+                    lastX = x
+                    lastY = y
                 }
                 area.lineTo(w, h)
                 area.close()
-                drawPath(area, color.copy(alpha = 0.10f))
-                drawPath(line, color, style = Stroke(width = 1.5f))
+                drawPath(
+                    area,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.02f)),
+                        startY = 0f,
+                        endY = h,
+                    ),
+                )
+                drawPath(line, color, style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                // 实时端点:最新采样加光点
+                drawCircle(color.copy(alpha = 0.25f), radius = 4.5f, center = Offset(lastX, lastY))
+                drawCircle(color, radius = 2.2f, center = Offset(lastX, lastY))
             }
         }
     }

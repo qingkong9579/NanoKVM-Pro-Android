@@ -12,6 +12,7 @@
 - 设备监控:CPU/内存/温度/负载 2s 采样、固定窗口滚动曲线、1/2/5/10s 间隔可调 + 更新 toast
 - 主题:深浅色双套(DotGrid/图标 contentColor 随主题)+ 全局切换按钮(连接页右上、控制台顶栏)
 - 平板自适应:横屏双栏(真横屏 ≥600dp 且宽>高),竖屏/手机堆叠;画面条带自适应
+- 视觉打磨(v0.1.3,按 `.workbench/spec.md` 令牌):全局排版刻度(标题15sp/500·正文13sp·次要12sp)、性能/监控曲线渐变填充+实时端点+圆角线帽、工具箱行图标底座(32dp/8dp 圆角)、虚拟键盘等宽键块、图标统一 20dp/40dp 命中区、连接页点阵满屏+卡片描边阴影
 
 ### 重要修复记录
 - WebRTC 真机(arm64)闪退:**R8 shrink 导致 libjingle JNI_OnLoad SIGTRAP** → proguard 固定 `-dontobfuscate -dontoptimize -dontshrink`(详见 §3)
@@ -20,6 +21,8 @@
 - 上传 Cursor 未 moveToFirst → CursorIndexOutOfBounds(两处同源已修)
 - 深浅色图标黑对黑:根因无 Surface 时 LocalContentColor 恒黑 → Theme 层按 scheme 提供
 - DotGridBackground 曾硬编码浅色 → 改随 MaterialTheme
+- 控制台深色状态栏露白:根 Column 只 statusBarsPadding 未铺底色 → background 必须在 statusBarsPadding 之前
+- 虚拟键盘 F10-12/CLR 标签被裁:等宽键帽内 padding 挤压文字 → 长标签(>2字符)降 12sp + padding 2dp
 
 ## 2. 目录结构
 ```
