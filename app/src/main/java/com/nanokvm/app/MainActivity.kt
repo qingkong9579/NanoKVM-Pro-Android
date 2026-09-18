@@ -30,7 +30,10 @@ class MainActivity : ComponentActivity() {
             // Theme default + persisted override (SYSTEM follows the OS).
             var themeSetting by remember { mutableStateOf(ThemeSetting.SYSTEM) }
             LaunchedEffect(Unit) {
-                themeSetting = store.settings.first().theme
+                val s = store.settings.first()
+                themeSetting = s.theme
+                com.nanokvm.app.ui.theme.GlassPrefs.blurRadiusDp = s.blurRadius.toFloat()
+                com.nanokvm.app.ui.theme.GlassPrefs.tintAlpha = s.glassAlpha / 100f
             }
             val systemDark = isSystemInDarkTheme()
             val dark = when (themeSetting) {

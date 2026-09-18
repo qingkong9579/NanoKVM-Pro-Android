@@ -3,8 +3,15 @@ package com.nanokvm.app.ui.console
 import android.os.SystemClock
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
@@ -48,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -57,11 +67,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,6 +88,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,10 +101,18 @@ import com.nanokvm.app.media.WebRtcEnv
 import com.nanokvm.app.ui.components.SegmentedButtons
 import com.nanokvm.app.ui.components.StatusChip
 import com.nanokvm.app.ui.theme.DotGridBackground
+import com.nanokvm.app.ui.theme.GlassShapes
+import com.nanokvm.app.ui.theme.GlassPanel
+import com.nanokvm.app.ui.theme.GlassTokens
+import com.nanokvm.app.ui.theme.RefractionHighlight
+import com.nanokvm.app.ui.theme.glassFrost
 import com.nanokvm.app.ui.theme.StatusTone
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Main remote-desktop console: top status bar + action bar + video stage + keyboard. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,35 +132,50 @@ fun ConsoleScreen(
         viewModel.start()
     }
 
-    Column(
+    val hazeState = remember { HazeState() }
+    var statsDock by rememberSaveable { mutableStateOf(false) }
+    // 沉浸式布局:视频层铺满全屏,顶部 chrome 与键盘以磨砂玻璃悬浮其上
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            // 底色必须铺到状态栏后面:只 padding 不铺底,深色主题会露出白色窗口底
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding(),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        TopBar(state, isDark, onToggleTheme, onBack, viewModel)
-        ActionBar(state, viewModel)
-        Box(modifier = Modifier.weight(1f)) {
+        // 视频层 = haze 采样源(顶栏/工具条/键盘/dock 均对其磨砂)
+        Box(Modifier.fillMaxSize().haze(hazeState)) {
             VideoStage(state, viewModel)
-            StageOverlays(state, viewModel)
-            if (state.statsVisible) StatsOverlay(state, viewModel, stats)
+        }
+        StageOverlays(state, viewModel)
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.statusBarsPadding()) {
+                TopBar(state, isDark, onToggleTheme, onBack, viewModel, hazeState)
+            }
+            ActionBar(state, viewModel, isDark, hazeState)
+            if (state.phase == Phase.CONNECTING) FlowLine(Modifier.fillMaxWidth())
+        }
+        if (state.statsVisible) {
+            StatsOverlay(
+                state, stats, statsDock, hazeState, isDark,
+                keyboardOffset = if (state.vkbVisible) 260.dp else 0.dp,
+            ) { statsDock = it }
         }
         if (state.vkbVisible) {
             VirtualKeyboard(
+                isDark = isDark,
+                activeModifiers = state.activeModifiers,
+                hazeState = hazeState,
+                modifier = Modifier.align(Alignment.BottomCenter),
                 onKeyDown = viewModel::vkbKeyDown,
                 onKeyUp = viewModel::vkbKeyUp,
                 onModifierToggle = viewModel::vkbModifierToggle,
                 onAction = viewModel::vkbAction,
             )
         }
-    }
-
-    if (state.settingsSheetOpen) {
-        SettingsSheet(state, viewModel)
+        if (state.settingsSheetOpen) {
+            SettingsSheet(state, viewModel, isDark, hazeState)
+        }
     }
     if (state.toolsSheetOpen) {
-        ConsoleToolsSheet(state, viewModel, onOpenTerminal, onOpenAssistant)
+        ConsoleToolsSheet(state, viewModel, isDark, onOpenTerminal, onOpenAssistant)
     }
 }
 
@@ -149,12 +186,13 @@ private fun TopBar(
     onToggleTheme: () -> Unit,
     onBack: () -> Unit,
     viewModel: ConsoleViewModel,
+    hazeState: HazeState,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .glassFrost(hazeState, isDark)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -165,6 +203,40 @@ private fun TopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (state.phase == Phase.ERROR && state.error != null) {
+                // v2:会话异常时三 chip 合并为一条告警条,重连随手可及
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFDE3B32).copy(alpha = 0.14f), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFDE3B32).copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                        .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFF87171),
+                    )
+                    Text(
+                        text = "会话错误 · ${state.error}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFFF87171),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    TextButton(
+                        onClick = { viewModel.reconnect() },
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                    ) {
+                        Text("重连", style = MaterialTheme.typography.labelMedium, color = Color(0xFFF87171))
+                    }
+                }
+            } else {
         // 画面:分辨率;分阶段给可扫读文案与状态色
         val picValue = when {
             state.phase == Phase.ERROR -> "无画面"
@@ -213,6 +285,7 @@ private fun TopBar(
             tone = StatusTone.Ok,
             modifier = Modifier.height(28.dp),
         )
+            }
         }
         IconButton(onClick = onToggleTheme, modifier = Modifier.size(40.dp)) {
             Icon(
@@ -241,10 +314,10 @@ private fun TopBar(
 }
 
 @Composable
-private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel) {
+private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark: Boolean, hazeState: HazeState) {
     Column(modifier = Modifier
         .fillMaxWidth()
-        .background(MaterialTheme.colorScheme.surface),
+        .glassFrost(hazeState, isDark),
     ) {
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -262,7 +335,7 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel) {
             ActionIcon(Icons.Outlined.Mouse, "鼠标模式", "鼠标") {
                 viewModel.setMouseMode(if (state.mouseMode == HidMouseMode.ABSOLUTE) HidMouseMode.RELATIVE else HidMouseMode.ABSOLUTE)
             }
-            ActionIcon(Icons.Outlined.Keyboard, "虚拟键盘", "键盘") { viewModel.toggleVirtualKeyboard() }
+            ActionIcon(Icons.Outlined.Keyboard, "虚拟键盘", "键盘", active = state.vkbVisible, isDark = isDark) { viewModel.toggleVirtualKeyboard() }
             ActionIcon(Icons.Outlined.Handyman, "工具箱", "工具箱") { viewModel.toggleToolsSheet() }
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.width(8.dp))
@@ -274,7 +347,7 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel) {
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             )
             Spacer(modifier = Modifier.width(8.dp))
-            ActionIcon(Icons.Outlined.BarChart, "性能", "性能") { viewModel.toggleStats() }
+            ActionIcon(Icons.Outlined.BarChart, "性能", "性能", active = state.statsVisible, isDark = isDark) { viewModel.toggleStats() }
             ActionIcon(Icons.Outlined.Refresh, "重新连接", "重连") { viewModel.reconnect() }
         }
         HorizontalDivider(
@@ -290,19 +363,31 @@ private fun ActionIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     caption: String,
+    active: Boolean = false,
+    isDark: Boolean = true,
     onClick: () -> Unit,
 ) {
+    // 激活态(design-v2):青色玻璃底 + 青色内容,标记 开启中的面板(键盘/性能)。
+    val activeBg = if (isDark) Color(0xFF7BE7FF).copy(alpha = 0.12f) else Color(0xFF2F6FED).copy(alpha = 0.10f)
+    val activeFg = if (isDark) Color(0xFF7BE7FF) else Color(0xFF2F6FED)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(min = 40.dp),
+        modifier = Modifier
+            .widthIn(min = 40.dp)
+            .then(if (active) Modifier.background(activeBg, RoundedCornerShape(10.dp)) else Modifier),
     ) {
         IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
-            Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp))
+            Icon(
+                icon,
+                contentDescription = label,
+                modifier = Modifier.size(20.dp),
+                tint = if (active) activeFg else MaterialTheme.colorScheme.onSurface,
+            )
         }
         Text(
             text = caption,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (active) activeFg else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )
     }
@@ -536,66 +621,150 @@ private fun StageOverlays(state: ConsoleUiState, viewModel: ConsoleViewModel) {
     }
 }
 
-/** NanoKVM-style diagnosis panel: metrics grid + time-series curves. */
+/** v2 性能面板:收起态 = 右上玻璃细条;展开态 = 底部玻璃抽屉(不再遮挡画面主体)。 */
 @Composable
-private fun BoxScope.StatsOverlay(state: ConsoleUiState, viewModel: ConsoleViewModel, stats: StatsUi) {
-    Column(
-        modifier = Modifier
-            .align(Alignment.TopEnd)
-            .padding(10.dp)
-            .width(276.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.78f))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatsChip("${stats.codec} · ${stats.transport}")
-            Spacer(Modifier.weight(1f))
-            StatsChip(if (state.videoFormatKnown) "${state.videoWidth}×${state.videoHeight}" else "—")
-            IconButton(onClick = { viewModel.toggleStats() }) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = "关闭统计",
-                    tint = Color.White.copy(alpha = 0.75f),
-                    modifier = Modifier.size(20.dp),
-                )
+private fun BoxScope.StatsOverlay(
+    state: ConsoleUiState,
+    stats: StatsUi,
+    expanded: Boolean,
+    hazeState: HazeState,
+    isDark: Boolean,
+    keyboardOffset: Dp,
+    onExpanded: (Boolean) -> Unit,
+) {
+    if (!expanded) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.Black.copy(alpha = 0.72f))
+                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+                .clickable { onExpanded(true) }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(if (state.phase == Phase.STREAMING) Color(0xFF45E07A) else Color(0xFFF2B33D)),
+            )
+            Text(
+                text = buildString {
+                    append(stats.codec)
+                    append(" · ")
+                    append(stats.transport)
+                    if (stats.fps > 0) {
+                        append(" · ")
+                        append("%.0f fps".format(stats.fps))
+                    }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFE8EAED),
+            )
+            Text(
+                text = "▾",
+                color = Color(0xFFB9C2CB),
+                fontSize = 11.sp,
+                modifier = Modifier.padding(end = 2.dp),
+            )
+        }
+    } else {
+        GlassPanel(
+            isDark = true,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp + keyboardOffset)
+                .fillMaxWidth(),
+            tint = Color(0xFF050607),
+            tintAlphaOverride = 0.55f,
+            blurOverride = 18.dp,
+            hazeState = hazeState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+            RefractionHighlight(Modifier.align(Alignment.CenterHorizontally), isDark = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("性能", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                StatsChip("${stats.codec} · ${stats.transport}")
+                if (state.videoFormatKnown) StatsChip("${state.videoWidth}×${state.videoHeight}")
+                Spacer(Modifier.weight(1f))
+                if (stats.fps > 0) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color(0xFF45E07A).copy(alpha = 0.14f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            "%.0f fps".format(stats.fps),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF45E07A),
+                        )
+                    }
+                }
+                IconButton(onClick = { onExpanded(false) }, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "收起性能",
+                        tint = Color.White.copy(alpha = 0.75f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            StatsGrid(stats, if (state.videoFormatKnown) "${state.videoWidth}×${state.videoHeight}" else "—")
+            Sparkline("实时帧率", stats.historyFps) { "%.0f fps".format(it) }
+            Sparkline("码率", stats.historyKbps) { "%.0f kbps".format(it) }
+            Sparkline("总测延迟", stats.historyMs) { "%.0f ms".format(it) }
             }
         }
-        StatsGrid(stats)
-        Sparkline("实时帧率", stats.historyFps) { "%.0f fps".format(it) }
-        Sparkline("码率", stats.historyKbps) { "%.0f kbps".format(it) }
-        Sparkline("总测延迟", stats.historyMs) { "%.0f ms".format(it) }
     }
 }
 
 @Composable
-private fun StatsGrid(stats: StatsUi) {
+private fun StatsGrid(stats: StatsUi, resolution: String) {
     @Composable
-    fun tileRow(one: Pair<String, String>, two: Pair<String, String>? = null) {
+    fun tileRow3(one: Pair<String, String>, two: Pair<String, String>, three: Pair<String, String>) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             StatTile(one.first, one.second)
-            if (two != null) StatTile(two.first, two.second)
+            StatTile(two.first, two.second)
+            StatTile(three.first, three.second)
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (stats.transport == "WebRTC") {
             // WebRTC: network + jitter-buffer metrics from RTCStatsReport (decode
             // happens inside the SDK, so there is no local decode-latency probe).
-            tileRow("码率" to if (stats.bitrateKbps > 0) "%.0f kbps".format(stats.bitrateKbps) else "—",
-                "实时帧率" to if (stats.fps > 0) "%.0f fps".format(stats.fps) else "—")
-            tileRow("抖动缓冲" to if (stats.jitterMs > 0) "%.1f ms".format(stats.jitterMs) else "—",
-                "ICE RTT" to if (stats.rttMs > 0) "%.1f ms".format(stats.rttMs) else "—")
-            tileRow("丢包" to if (stats.packetsLost > 0) "${stats.packetsLost}" else "0",
-                "总测延迟" to "${stats.totalMs} ms")
+            tileRow3(
+                "码率" to if (stats.bitrateKbps > 0) "%.0f kbps".format(stats.bitrateKbps) else "—",
+                "实时帧率" to if (stats.fps > 0) "%.0f fps".format(stats.fps) else "—",
+                "抖动缓冲" to if (stats.jitterMs > 0) "%.1f ms".format(stats.jitterMs) else "—",
+            )
+            tileRow3(
+                "ICE RTT" to if (stats.rttMs > 0) "%.1f ms".format(stats.rttMs) else "—",
+                "丢包" to if (stats.packetsLost > 0) "${stats.packetsLost}" else "0",
+                "总测延迟" to "${stats.totalMs} ms",
+            )
         } else {
             // Direct: local MediaCodec path metrics (no ICE/jitter-buffer of its
             // own — 抖动缓冲 is the decoder queue backlog estimate).
-            tileRow("码率" to if (stats.bitrateKbps > 0) "%.0f kbps".format(stats.bitrateKbps) else "—",
-                "实时帧率" to if (stats.fps > 0) "%.0f fps".format(stats.fps) else "—")
-            tileRow("解码延迟" to if (stats.decodeMs > 0) "%.1f ms".format(stats.decodeMs) else "—",
-                "抖动缓冲" to if (stats.fps > 0) "%.1f ms".format(stats.jitterMs) else "—")
-            tileRow("总测延迟" to "${stats.totalMs} ms")
+            tileRow3(
+                "码率" to if (stats.bitrateKbps > 0) "%.0f kbps".format(stats.bitrateKbps) else "—",
+                "实时帧率" to if (stats.fps > 0) "%.0f fps".format(stats.fps) else "—",
+                "解码延迟" to if (stats.decodeMs > 0) "%.1f ms".format(stats.decodeMs) else "—",
+            )
+            tileRow3(
+                "抖动缓冲" to if (stats.fps > 0) "%.1f ms".format(stats.jitterMs) else "—",
+                "总测延迟" to "${stats.totalMs} ms",
+                "分辨率" to resolution,
+            )
         }
     }
 }
@@ -730,6 +899,33 @@ private fun Sparkline(label: String, values: List<Float>, fmt: (Float) -> String
     }
 }
 
+/** 连接中:顶缘流光进度线(青→绿渐变横扫),体感“活着”。 */
+@Composable
+private fun FlowLine(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "flow")
+    val x by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing)),
+        label = "flowx",
+    )
+    Box(
+        modifier = modifier
+            .height(2.dp)
+            .drawBehind {
+                val band = 360f
+                val start = Offset((size.width + band) * x - band, 0f)
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.Transparent, Color(0xFF7BE7FF), Color(0xFF45E07A), Color.Transparent),
+                        start = start,
+                        end = start.copy(x = start.x + band),
+                    ),
+                )
+            },
+    )
+}
+
 @Composable
 private fun LoadingOverlay(text: String, reconnecting: Int?) {
     Box(
@@ -826,29 +1022,36 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
     }
 }
 
-/** Settings bottom sheet: stream codec, transport, mouse mode, reconnect. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 设置面板(树内磨砂,非弹窗):调模糊度/透明度滑杆时面板自身即实时预览。 */
 @Composable
-private fun SettingsSheet(state: ConsoleUiState, viewModel: ConsoleViewModel) {
-    val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(
-        onDismissRequest = { viewModel.toggleSettingsSheet() },
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
+private fun BoxScope.SettingsSheet(
+    state: ConsoleUiState,
+    viewModel: ConsoleViewModel,
+    isDark: Boolean,
+    hazeState: HazeState,
+) {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(alpha = 0.40f))
+            .clickable { viewModel.toggleSettingsSheet() },
+    )
+    GlassPanel(
+        isDark = isDark,
+        shape = GlassShapes.sheet,
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        tint = if (isDark) Color(0xFF0E0F11) else Color.White,
+        hazeState = hazeState,
     ) {
-        Box(
+        RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
+        Column(
             modifier = Modifier
+                .widthIn(max = 560.dp)
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center,
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            DragHandle(isDark)
             Text("视频流", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Two independent axes compose the firmware mode string (h264|h265)-(direct|webrtc).
             val mode = state.streamMode
@@ -864,6 +1067,43 @@ private fun SettingsSheet(state: ConsoleUiState, viewModel: ConsoleViewModel) {
                 selected = transport,
                 onSelect = { viewModel.setStreamMode("$codec-$it") },
             )
+            Text("磨砂玻璃", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("模糊度", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(52.dp))
+                Slider(
+                    value = state.blurRadiusDp.toFloat(),
+                    onValueChange = { viewModel.setGlassBlur(it.roundToInt()) },
+                    onValueChangeFinished = viewModel::commitGlassStyle,
+                    valueRange = 4f..40f,
+                    modifier = Modifier.weight(1f).height(28.dp),
+                )
+                Text(
+                    "${state.blurRadiusDp}dp",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("透明度", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(52.dp))
+                Slider(
+                    value = state.glassAlphaPct.toFloat(),
+                    onValueChange = { viewModel.setGlassAlpha(it.roundToInt()) },
+                    onValueChangeFinished = viewModel::commitGlassStyle,
+                    valueRange = 5f..80f,
+                    modifier = Modifier.weight(1f).height(28.dp),
+                )
+                Text(
+                    "${state.glassAlphaPct}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
             Text("鼠标模式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SegmentedButtons(
                 options = listOf("绝对" to HidMouseMode.ABSOLUTE, "相对" to HidMouseMode.RELATIVE),
@@ -882,7 +1122,19 @@ private fun SettingsSheet(state: ConsoleUiState, viewModel: ConsoleViewModel) {
             Spacer(modifier = Modifier.height(12.dp))
             }
         }
-    }
+}
+
+/** 玻璃抽屉顶部拖拽指示条(design-v2)。 */
+@Composable
+private fun DragHandle(isDark: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(width = 36.dp, height = 4.dp)
+            .background(
+                if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f),
+                RoundedCornerShape(2.dp),
+            ),
+    )
 }
 
 /**
@@ -998,8 +1250,12 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.touchMou
                     }
                 }
             }
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            // 协程被取消(如弹层 scrim 掐断指针流):必须上抛,否则 while(true) 会在
+            // 已取消的协程上立即重入、非挂起自旋,主线程 100% 触发 ANR(实测)。
+            throw e
         } catch (_: Throwable) {
-            // gesture coroutine cancelled; continue to next gesture
+            // gesture error; continue to next gesture
         }
     }
 }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -32,6 +33,9 @@ data class ConsoleUiState(
     val reconnecting: Int? = null,
     val error: String? = null,
     val vkbVisible: Boolean = false,
+    val activeModifiers: Int = 0,
+    val blurRadiusDp: Int = 16,  // 磨砂模糊半径
+    val glassAlphaPct: Int = 24, // 磨砂 tint 强度(百分比)
     val mouseMode: String = HidMouseMode.ABSOLUTE,
     val streamMode: String = StreamMode.H264_DIRECT,
     val settingsSheetOpen: Boolean = false,
@@ -73,6 +77,7 @@ class ConsoleViewModel(
     private val password: String,
     okHttp: OkHttpClient,
     appContext: android.content.Context,
+    private val settingsStore: com.nanokvm.app.settings.SettingsStore? = null,
 ) : ViewModel() {
 
     companion object {
@@ -84,9 +89,12 @@ class ConsoleViewModel(
             password: String,
             okHttp: OkHttpClient,
             appContext: android.content.Context,
+            settingsStore: com.nanokvm.app.settings.SettingsStore? = null,
         ): androidx.lifecycle.ViewModelProvider.Factory =
             viewModelFactory {
-                initializer { ConsoleViewModel(host, username, password, okHttp, appContext) }
+                initializer {
+                    ConsoleViewModel(host, username, password, okHttp, appContext, settingsStore)
+                }
             }
     }
 
@@ -274,27 +282,74 @@ class ConsoleViewModel(
         _state.value = _state.value.copy(vkbVisible = !_state.value.vkbVisible)
     }
 
+    /** 磨砂模糊半径(实时生效,滑杆松手后持久化)。 */
+    fun setGlassBlur(dp: Int) {
+        _state.value = _state.value.copy(blurRadiusDp = dp)
+        com.nanokvm.app.ui.theme.GlassPrefs.blurRadiusDp = dp.toFloat()
+    }
+
+    /** 磨砂 tint 强度百分比(实时生效)。 */
+    fun setGlassAlpha(pct: Int) {
+        _state.value = _state.value.copy(glassAlphaPct = pct)
+        com.nanokvm.app.ui.theme.GlassPrefs.tintAlpha = pct / 100f
+    }
+
+    fun commitGlassStyle() {
+        val store = settingsStore ?: return
+        val r = _state.value.blurRadiusDp
+        val a = _state.value.glassAlphaPct
+        viewModelScope.launch { store.saveGlassStyle(r, a) }
+    }
+
+    init {
+        viewModelScope.launch {
+            settingsStore?.settings?.first()?.let { s ->
+                _state.value = _state.value.copy(
+                    blurRadiusDp = s.blurRadius,
+                    glassAlphaPct = s.glassAlpha,
+                )
+                com.nanokvm.app.ui.theme.GlassPrefs.blurRadiusDp = s.blurRadius.toFloat()
+                com.nanokvm.app.ui.theme.GlassPrefs.tintAlpha = s.glassAlpha / 100f
+            }
+        }
+    }
+
     // ---- virtual keyboard callbacks ----
     fun vkbKeyDown(key: KKey.HID) = hidHost?.pressHid(key.keyId(), key.usage)
     fun vkbKeyUp(key: KKey.HID) = hidHost?.releaseHid(key.keyId())
-    fun vkbModifierToggle(key: KKey.Mod) = hidHost?.toggleModifier(key.keyId(), key.bit)
+    fun vkbModifierToggle(key: KKey.Mod) {
+        hidHost?.toggleModifier(key.keyId(), key.bit)
+        syncActiveModifiers()
+    }
     fun vkbAction(action: ActionKind) = hidHost?.action(action)
+
+    private fun syncActiveModifiers() {
+        _state.value = _state.value.copy(activeModifiers = hidHost?.activeModifiers() ?: 0)
+    }
 
     // ---- physical keyboard (Android KeyEvent) ----
     fun physicalKeyDown(keyCode: Int): Boolean {
         val bit = HidKeymap.modifierBit(keyCode)
         val usage = HidKeymap.hidUsage(keyCode)
-        if (bit != 0) return hidHost?.pressModifier(keyCode, bit) ?: false
-        if (usage != null) return hidHost?.pressHid(keyCode, usage) ?: false
-        return false
+        val r = if (bit != 0) {
+            val ok = hidHost?.pressModifier(keyCode, bit) ?: false
+            syncActiveModifiers()
+            ok
+        } else {
+            usage != null && (hidHost?.pressHid(keyCode, usage) ?: false)
+        }
+        return r
     }
 
     fun physicalKeyUp(keyCode: Int): Boolean {
         val bit = HidKeymap.modifierBit(keyCode)
-        if (bit != 0) return hidHost?.releaseModifier(keyCode, bit) ?: false
+        if (bit != 0) {
+            val ok = hidHost?.releaseModifier(keyCode, bit) ?: false
+            syncActiveModifiers()
+            return ok
+        }
         val usage = HidKeymap.hidUsage(keyCode)
-        if (usage != null) return hidHost?.releaseHid(keyCode) ?: false
-        return false
+        return usage != null && (hidHost?.releaseHid(keyCode) ?: false)
     }
 
     // ---- touch mouse (normalized over the video rect) ----
@@ -423,6 +478,8 @@ private class HidHost(
     private val mouseMode: () -> String,
 ) {
     private val kb = KeyboardCodec()
+    /** 激活中的修饰键位图(UI 粘滞高亮用)。 */
+    fun activeModifiers(): Int = kb.activeModifiers
     private val stickyMods = mutableSetOf<Any>()
     private val heldPhysicalMods = mutableMapOf<Int, Int>() // keyCode -> bit
 

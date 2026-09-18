@@ -34,8 +34,10 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+androidx-dynamicanimation = { group = "androidx.dynamicanimation", name = "dynamicanimation", version = "1.0.0" }
 webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtcSdk" }
 socketio = { group = "io.socket", name = "socket.io-client", version.ref = "socketIo" }
+haze = { group = "dev.chrisbanes.haze", name = "haze", version = "1.2.2" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

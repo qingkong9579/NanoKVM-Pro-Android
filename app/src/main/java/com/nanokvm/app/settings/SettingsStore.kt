@@ -2,6 +2,7 @@ package com.nanokvm.app.settings
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,8 @@ data class AppSettings(
     val streamMode: String = "h264-direct",
     val mouseMode: String = "absolute",
     val theme: ThemeSetting = ThemeSetting.SYSTEM,
+    val blurRadius: Int = 16,  // 磨砂模糊半径 dp
+    val glassAlpha: Int = 24,  // 磨砂 tint 强度(百分比)
 )
 
 class SettingsStore(private val context: Context) {
@@ -28,8 +31,10 @@ class SettingsStore(private val context: Context) {
         private val USERNAME = stringPreferencesKey("username")
         private val PASSWORD = stringPreferencesKey("password")
         private val STREAM_MODE = stringPreferencesKey("stream_mode")
-        private val MOUSE_MODE = stringPreferencesKey("mouse_mode")
-        private val THEME = stringPreferencesKey("theme")
+    private val MOUSE_MODE = stringPreferencesKey("mouse_mode")
+    private val THEME = stringPreferencesKey("theme")
+    private val BLUR_RADIUS = intPreferencesKey("blur_radius")
+    private val GLASS_ALPHA = intPreferencesKey("glass_alpha")
     }
 
     val settings: Flow<AppSettings> = context.appDataStore.data.map { prefs ->
@@ -44,6 +49,8 @@ class SettingsStore(private val context: Context) {
                 "dark" -> ThemeSetting.DARK
                 else -> ThemeSetting.SYSTEM
             },
+            blurRadius = prefs[BLUR_RADIUS] ?: 16,
+            glassAlpha = prefs[GLASS_ALPHA] ?: 24,
         )
     }
 
@@ -72,6 +79,14 @@ class SettingsStore(private val context: Context) {
                 ThemeSetting.DARK -> "dark"
                 ThemeSetting.SYSTEM -> "system"
             }
+        }
+    }
+
+    /** Persists only the frosted-glass style (blur radius dp + tint alpha percent). */
+    suspend fun saveGlassStyle(blurRadius: Int, glassAlpha: Int) {
+        context.appDataStore.edit { prefs ->
+            prefs[BLUR_RADIUS] = blurRadius
+            prefs[GLASS_ALPHA] = glassAlpha
         }
     }
 

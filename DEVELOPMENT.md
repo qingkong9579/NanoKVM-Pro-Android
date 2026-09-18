@@ -12,6 +12,8 @@
 - 设备监控:CPU/内存/温度/负载 2s 采样、固定窗口滚动曲线、1/2/5/10s 间隔可调 + 更新 toast
 - 主题:深浅色双套(DotGrid/图标 contentColor 随主题)+ 全局切换按钮(连接页右上、控制台顶栏)
 - 平板自适应:横屏双栏(真横屏 ≥600dp 且宽>高),竖屏/手机堆叠;画面条带自适应
+- 磨砂玻璃体系 v0.1.4(haze 1.2.2,MIT):控制台改沉浸式布局(视频全屏铺满,顶栏/工具条/键盘/性能 dock/设置面板以磨砂玻璃悬浮于视频上,实时透出画面);设置 Sheet 新增「磨砂玻璃」模糊度(4–40dp)/透明度(5–80%)滑杆,实时预览、DataStore 持久化;工具箱二级参数行优化(ToolParamRow:图标+标题+右侧当前值+内嵌分段)
+- 曾试验 AndroidLiquidGlassView(AGSL 折射透镜)并 vendor 其源码,因「透镜必然位于被采样 content 内」造成 RenderNode 自引用递归(RednerThread 栈溢出,需录制期全局抑制+去硬件层才可稳定),且多透镜经共享树仍会互指——已整体移除,统一用 haze 方案
 - 视觉打磨(v0.1.3,按 `.workbench/spec.md` 令牌):全局排版刻度(标题15sp/500·正文13sp·次要12sp)、性能/监控曲线渐变填充+实时端点+圆角线帽、工具箱行图标底座(32dp/8dp 圆角)、虚拟键盘等宽键块、图标统一 20dp/40dp 命中区、连接页点阵满屏+卡片描边阴影
 
 ### 重要修复记录
@@ -23,6 +25,8 @@
 - DotGridBackground 曾硬编码浅色 → 改随 MaterialTheme
 - 控制台深色状态栏露白:根 Column 只 statusBarsPadding 未铺底色 → background 必须在 statusBarsPadding 之前
 - 虚拟键盘 F10-12/CLR 标签被裁:等宽键帽内 padding 挤压文字 → 长标签(>2字符)降 12sp + padding 2dp
+- 触控鼠标手势 ANR:pointerInput 协程被取消时 catch(Throwable) 吞掉 CancellationException → while(true) 非挂起自旋;取消异常必须上抛
+- 设置面板要能实时预览磨砂效果:ModalBottomSheet 是独立窗口,haze 无法跨窗采样 → 改为树内磨砂面板(scrim + GlassPanel)
 
 ## 2. 目录结构
 ```

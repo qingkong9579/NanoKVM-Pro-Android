@@ -2,6 +2,7 @@ package com.nanokvm.app.ui.connect
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Computer
@@ -32,13 +34,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +56,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nanokvm.app.ui.AppSession
 import com.nanokvm.app.ui.theme.DotGridBackground
+import com.nanokvm.app.ui.theme.GlassShapes
+import com.nanokvm.app.ui.theme.GlassPanel
+import com.nanokvm.app.ui.theme.GlassTokens
 import com.nanokvm.app.ui.theme.OneKvmColors
+import com.nanokvm.app.ui.theme.RefractionHighlight
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 
 /**
  * One-KVM login style: centered card on the dotted backdrop, built as two visual
@@ -71,6 +83,7 @@ fun ConnectScreen(
     val state by viewModel.state.collectAsState()
     val error = state.error
     val fieldsEnabled = !state.busy
+    val hazeState = remember { HazeState() }
 
     // 点阵底纹必须铺满整屏(edge-to-edge 含系统栏):内边距只会内缩画布、
     // 露出窗口底色形成四周一圈;呼吸边距改由卡片外层 padding 承担(对应 web 的 p-4)。
@@ -78,7 +91,10 @@ fun ConnectScreen(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        DotGridBackground(Modifier.fillMaxSize())
+        // 背景层 = haze 采样源(只含底纹;磨砂卡片与其同级,避免自引用)
+        Box(Modifier.matchParentSize().haze(hazeState)) {
+            DotGridBackground(Modifier.fillMaxSize())
+        }
         // 右上角日夜切换(全局主题开关入口,置于底纹之上)
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
@@ -94,17 +110,26 @@ fun ConnectScreen(
                 )
             }
         }
-        Column(
+        // 磨砂玻璃卡(高斯模糊采样点阵底纹)。
+        GlassPanel(
+            isDark = isDark,
+            shape = GlassShapes.card,
             modifier = Modifier
                 .padding(16.dp)
                 .widthIn(max = 480.dp)
-                .shadow(2.dp, RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .shadow(if (isDark) 10.dp else 4.dp, GlassShapes.card),
+            tint = if (isDark) Color(0xFF0E0F11) else Color.White,
+            tintAlphaOverride = if (isDark) 0.30f else 0.55f,
+            hazeState = hazeState,
         ) {
+            RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             // Brand: one row — 48dp icon tile (12dp corners) + title 15sp/500 with
             // the 12sp subtitle inline to its right (single visual layer).
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,70 +166,72 @@ fun ConnectScreen(
                     },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                // 记忆设备 chip:上次连接的主机已持久化,回来一键直进。
+                if (state.host.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .background(GlassTokens.keyBg(isDark), RoundedCornerShape(999.dp))
+                            .border(1.dp, GlassTokens.hairline(isDark), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 9.dp, vertical = 4.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(OneKvmColors.SuccessBright),
+                        )
+                        Text(
+                            "已保存",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
 
-            // Credential fields: uniform outlined fields, 10dp corners, 10dp apart,
-            // 12sp labels, disabled while a connection attempt is in flight.
+            // Credential fields: 外浮标签 + 玻璃容器(无描边),48dp 视觉、56dp 触达。
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
+                GlassField(
+                    label = "主机地址",
+                    isDark = isDark,
                     value = state.host,
                     onValueChange = viewModel::onHostChange,
                     enabled = fieldsEnabled,
-                    label = { Text("主机地址", style = MaterialTheme.typography.labelMedium) },
-                    placeholder = { Text("192.168.5.47") },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Computer,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = "192.168.5.47",
+                    leading = Icons.Outlined.Computer,
                 )
-                OutlinedTextField(
+                GlassField(
+                    label = "用户名",
+                    isDark = isDark,
                     value = state.username,
                     onValueChange = viewModel::onUsernameChange,
                     enabled = fieldsEnabled,
-                    label = { Text("用户名", style = MaterialTheme.typography.labelMedium) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = "admin",
+                    leading = Icons.Outlined.Person,
                 )
-                OutlinedTextField(
+                GlassField(
+                    label = "密码",
+                    isDark = isDark,
                     value = state.password,
                     onValueChange = viewModel::onPasswordChange,
                     enabled = fieldsEnabled,
-                    label = { Text("密码", style = MaterialTheme.typography.labelMedium) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    trailingIcon = {
+                    placeholder = "••••••••",
+                    leading = Icons.Outlined.Lock,
+                    visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailing = {
                         IconButton(onClick = { viewModel.togglePasswordVisibility() }) {
                             Icon(
                                 if (state.showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                                 contentDescription = if (state.showPassword) "隐藏密码" else "显示密码",
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     },
-                    visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -256,7 +283,7 @@ fun ConnectScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("正在连接 ${state.host.trim().ifEmpty { "目标设备" }}…")
                 } else {
-                    Text("连接")
+                    Text(if (error != null) "重试连接" else "连接")
                 }
             }
 
@@ -268,6 +295,55 @@ fun ConnectScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            }
         }
+    }
+}
+
+/** 外浮标签玻璃输入框:标签在框外,容器为玻璃填充、无边框线。 */
+@Composable
+private fun GlassField(
+    label: String,
+    isDark: Boolean,
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean,
+    placeholder: String,
+    leading: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 5.dp),
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = enabled,
+            placeholder = {
+                Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            leadingIcon = {
+                Icon(leading, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            trailingIcon = trailing,
+            visualTransformation = visualTransformation,
+            singleLine = true,
+            shape = GlassShapes.input,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = GlassTokens.keyBg(isDark),
+                unfocusedContainerColor = GlassTokens.keyBg(isDark).copy(alpha = 0.6f),
+                disabledContainerColor = GlassTokens.keyBg(isDark).copy(alpha = 0.6f),
+                focusedBorderColor = GlassTokens.hairlineStrong(isDark),
+                unfocusedBorderColor = GlassTokens.hairline(isDark),
+                disabledBorderColor = Color.Transparent,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

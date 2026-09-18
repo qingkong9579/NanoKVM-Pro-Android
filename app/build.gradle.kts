@@ -14,8 +14,8 @@ android {
         applicationId = "com.nanokvm.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
     }
 
     signingConfigs {
@@ -93,6 +93,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.webrtc)
     implementation(libs.socketio)
+    // 高斯模糊磨砂(haze,MIT):API 31+ 真模糊,以下自动退化半透明 tint。
+    // https://github.com/chrisbanes/haze
+    implementation(libs.haze)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)

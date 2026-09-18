@@ -20,6 +20,9 @@ class KeyboardCodec {
 
     private var modifier = 0
 
+    /** 当前按下的修饰键位图(虚拟键盘粘滞高亮用)。 */
+    val activeModifiers: Int get() = modifier
+
     /** id -> (usage). Modifier keys are not in this list; they live in [modifier]. */
     private val pressedKeys: LinkedHashMap<Any, Int> = LinkedHashMap()
 

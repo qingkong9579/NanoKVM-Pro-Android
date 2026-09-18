@@ -84,6 +84,10 @@ import com.nanokvm.app.data.api.MountedImage
 import com.nanokvm.app.data.api.NanoKvmApi
 import com.nanokvm.app.data.hid.HidKeymap
 import com.nanokvm.app.ui.components.SegmentedButtons
+import com.nanokvm.app.ui.theme.GlassShapes
+import com.nanokvm.app.ui.theme.GlassPanel
+import com.nanokvm.app.ui.theme.GlassTokens
+import com.nanokvm.app.ui.theme.RefractionHighlight
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -96,6 +100,7 @@ import kotlin.math.roundToInt
 fun ConsoleToolsSheet(
     state: ConsoleUiState,
     viewModel: ConsoleViewModel,
+    isDark: Boolean,
     onOpenTerminal: (com.nanokvm.app.ui.terminal.TerminalRequest) -> Unit = {},
     onOpenAssistant: () -> Unit = {},
 ) {
@@ -148,22 +153,39 @@ fun ConsoleToolsSheet(
 
     fun busyOrError(): String? = busyText ?: errorText
 
-    ModalBottomSheet(onDismissRequest = { viewModel.toggleToolsSheet() }) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center,
+    ModalBottomSheet(
+        onDismissRequest = { viewModel.toggleToolsSheet() },
+        shape = GlassShapes.sheet,
+        containerColor = Color.Transparent,
+        dragHandle = null,
+    ) {
+        GlassPanel(
+            isDark = isDark,
+            shape = GlassShapes.sheet,
+            modifier = Modifier.fillMaxWidth(),
+            tint = if (isDark) Color(0xFF0E0F11) else Color.White,
+            tintAlphaOverride = if (isDark) 0.86f else 0.94f,
         ) {
+        RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
         Column(
             modifier = Modifier
                 .widthIn(max = 720.dp)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
+                .padding(bottom = 24.dp, top = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(
+                        if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f),
+                        RoundedCornerShape(2.dp),
+                    ),
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("工具箱", style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp))
                 Spacer(Modifier.weight(1f))
@@ -246,36 +268,33 @@ fun ConsoleToolsSheet(
                 }
                 SectionHeader("画面与鼠标")
                 val transformLocked = state.streamMode.endsWith("webrtc")
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.ScreenRotation,
                     title = "旋转",
                     subtitle = if (transformLocked) "仅直连可用(WebRTC 渲染层不支持)" else "仅改变本端显示",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("0°" to 0, "90°" to 90, "180°" to 180, "270°" to 270),
                         selected = state.videoRotation,
                         onSelect = { if (!transformLocked) viewModel.setVideoRotation(it) },
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.ZoomIn,
                     title = "缩放",
                     subtitle = if (transformLocked) "仅直连可用(WebRTC 渲染层不支持)" else "本端画面缩放",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("50%" to 0.5f, "75%" to 0.75f, "100%" to 1f, "150%" to 1.5f, "200%" to 2f),
                         selected = state.videoScale,
                         onSelect = { if (!transformLocked) viewModel.setVideoScale(it) },
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.BarChart,
                     title = "码率",
                     subtitle = "修改后立即重建视频流生效",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("自动" to 0, "无损" to 10000, "高" to 5000, "中" to 3000, "低" to 1000),
                         selected = bitrateSel,
@@ -299,12 +318,11 @@ fun ConsoleToolsSheet(
                         },
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.Speed,
                     title = "帧率",
                     subtitle = if (fpsSel == 0) "自动(源帧率)" else "$fpsSel fps",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("自动" to 0, "30" to 30, "60" to 60),
                         selected = fpsSel,
@@ -325,12 +343,11 @@ fun ConsoleToolsSheet(
                         },
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.Timeline,
                     title = "关键帧间隔 GOP",
                     subtitle = "每 $gopSel 帧一个关键帧",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("30" to 30, "50" to 50, "100" to 100, "200" to 200),
                         selected = gopSel,
@@ -351,24 +368,22 @@ fun ConsoleToolsSheet(
                         },
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.Mouse,
                     title = "鼠标模式",
                     subtitle = if (state.mouseMode == HidMouseMode.ABSOLUTE) "绝对模式(点哪指哪)" else "相对模式(拖动控制)",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("绝对" to HidMouseMode.ABSOLUTE, "相对" to HidMouseMode.RELATIVE),
                         selected = state.mouseMode,
                         onSelect = viewModel::setMouseMode,
                     )
                 }
-                ToolRow(
+                ToolParamRow(
                     icon = Icons.Outlined.SwapVert,
                     title = "滚轮方向",
                     subtitle = if (state.wheelDir > 0) "正常(下滚=向下)" else "反向",
-                )
-                Row(Modifier.padding(start = 44.dp, end = 4.dp)) {
+                ) {
                     SegmentedButtons(
                         options = listOf("正常" to 1, "反向" to -1),
                         selected = state.wheelDir,
@@ -398,7 +413,7 @@ fun ConsoleToolsSheet(
                         }
                     },
                 )
-                SectionHeader("电源")
+                SectionHeader("电源 · 危险区", danger = true)
                 ToolRow(
                     icon = Icons.Outlined.PowerSettingsNew,
                     title = "电源键短按",
@@ -570,11 +585,11 @@ fun ConsoleToolsSheet(
 // ---------- shared bits ----------
 
 @Composable
-private fun SectionHeader(title: String) {
+private fun SectionHeader(title: String, danger: Boolean = false) {
     Text(
         title,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp, bottom = 2.dp),
@@ -647,6 +662,48 @@ private fun ActionChip(label: String, onClick: () -> Unit) {
             .defaultMinSize(minHeight = 32.dp)
             .padding(horizontal = 12.dp, vertical = 7.dp),
     )
+}
+
+/**
+ * 二级参数选择行(v2 优化):图标底座 + 标题 + 右侧当前值一行;分段选择紧凑内嵌于下,
+ * 整行高度压缩、视觉成组。
+ */
+@Composable
+private fun ToolParamRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    selector: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(vertical = 2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.weight(1f))
+            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 44.dp, top = 4.dp),
+        ) {
+            selector()
+        }
+    }
 }
 
 @Composable

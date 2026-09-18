@@ -45,6 +45,7 @@ fun AppNav(
                     password = AppSession.password,
                     okHttp = okHttp,
                     appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext,
+                    settingsStore = settingsStore,
                 ),
             )
             ConsoleScreen(
