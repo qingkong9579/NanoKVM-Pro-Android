@@ -12,3 +12,4 @@ keystore.properties
 *.jks
 *.keystore
 nanokvm-release.keystore
+"*.log" ; echo "build_log.txt"  
