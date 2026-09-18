@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -123,45 +124,37 @@ fun ConnectScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-            // Brand: one row — 48dp icon tile (12dp corners) + title 15sp/500 with
-            // the 12sp subtitle inline to its right (single visual layer).
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 品牌:居中竖排(经典登录构图);已保存 chip 显示当前记忆状态。
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(OneKvmColors.NearBlack, RoundedCornerShape(12.dp)),
+                        .size(56.dp)
+                        .background(OneKvmColors.NearBlack, RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.Outlined.Computer,
                         contentDescription = null,
                         tint = OneKvmColors.SuccessBright,
-                        modifier = Modifier.size(26.dp),
+                        modifier = Modifier.size(30.dp),
                     )
                 }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(
-                            SpanStyle(
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            ),
-                        ) { append("NanoKVM Pro") }
-                        append("  ")
-                        withStyle(
-                            SpanStyle(
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        ) { append("局域网 · 远程桌面") }
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                // 记忆设备 chip:上次连接的主机已持久化,回来一键直进。
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "NanoKVM Pro",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "局域网 · 远程桌面",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (state.host.isNotBlank()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -186,6 +179,13 @@ fun ConnectScreen(
                     }
                 }
             }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(GlassTokens.hairline(isDark)),
+            )
 
             // Credential fields: 外浮标签 + 玻璃容器(无描边),48dp 视觉、56dp 触达。
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -345,12 +345,19 @@ private fun GlassField(
             singleLine = true,
             shape = GlassShapes.input,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = GlassTokens.keyBg(isDark),
-                unfocusedContainerColor = GlassTokens.keyBg(isDark).copy(alpha = 0.6f),
-                disabledContainerColor = GlassTokens.keyBg(isDark).copy(alpha = 0.6f),
-                focusedBorderColor = GlassTokens.hairlineStrong(isDark),
-                unfocusedBorderColor = GlassTokens.hairline(isDark),
+                // 显式配色:深色下文字/占位符/光标不再依赖默认值(曾出现灰字灰底)
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.06f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.04f else 0.03f),
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f),
+                focusedBorderColor = if (isDark) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.28f),
+                unfocusedBorderColor = Color.Transparent,
                 disabledBorderColor = Color.Transparent,
+                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             ),
             modifier = Modifier.fillMaxWidth(),
         )
