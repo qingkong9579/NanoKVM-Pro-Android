@@ -151,31 +151,39 @@ fun ConsoleScreen(
             }
             ActionBar(state, viewModel, isDark, hazeState)
             if (state.phase == Phase.CONNECTING) FlowLine(Modifier.fillMaxWidth())
+            // 收起态性能细条:始终悬在工具条正下方(右对齐)
+            if (state.statsVisible && !statsDock) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp)) {
+                    Spacer(Modifier.weight(1f))
+                    StatsStrip(state, stats) { statsDock = true }
+                }
+            }
         }
-        if (state.statsVisible) {
-            StatsOverlay(
-                state, stats, statsDock, hazeState, isDark,
-                keyboardOffset = if (state.vkbVisible) 260.dp else 0.dp,
-            ) { statsDock = it }
+        if (state.statsVisible && statsDock) {
+            StatsDock(state, stats, hazeState, isDark, keyboardOffset = if (state.vkbVisible) 260.dp else 0.dp) {
+                statsDock = false
+            }
         }
         if (state.vkbVisible) {
-            VirtualKeyboard(
-                isDark = isDark,
-                activeModifiers = state.activeModifiers,
-                hazeState = hazeState,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                onKeyDown = viewModel::vkbKeyDown,
-                onKeyUp = viewModel::vkbKeyUp,
-                onModifierToggle = viewModel::vkbModifierToggle,
-                onAction = viewModel::vkbAction,
-            )
+            // 对齐必须在调用处包一层 Box:透传进 VirtualKeyboard 内部的 align 会被丢弃
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                VirtualKeyboard(
+                    isDark = isDark,
+                    activeModifiers = state.activeModifiers,
+                    hazeState = hazeState,
+                    onKeyDown = viewModel::vkbKeyDown,
+                    onKeyUp = viewModel::vkbKeyUp,
+                    onModifierToggle = viewModel::vkbModifierToggle,
+                    onAction = viewModel::vkbAction,
+                )
+            }
         }
         if (state.settingsSheetOpen) {
             SettingsSheet(state, viewModel, isDark, hazeState)
         }
-    }
-    if (state.toolsSheetOpen) {
-        ConsoleToolsSheet(state, viewModel, isDark, onOpenTerminal, onOpenAssistant)
+        if (state.toolsSheetOpen) {
+            ConsoleToolsSheet(state, viewModel, isDark, hazeState, onOpenTerminal, onOpenAssistant)
+        }
     }
 }
 
@@ -621,109 +629,108 @@ private fun StageOverlays(state: ConsoleUiState, viewModel: ConsoleViewModel) {
     }
 }
 
-/** v2 性能面板:收起态 = 右上玻璃细条;展开态 = 底部玻璃抽屉(不再遮挡画面主体)。 */
+/** 收起态性能细条(玻璃胶囊,悬在工具条正下方)。 */
 @Composable
-private fun BoxScope.StatsOverlay(
+private fun StatsStrip(state: ConsoleUiState, stats: StatsUi, onExpand: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+            .clickable(onClick = onExpand)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(if (state.phase == Phase.STREAMING) Color(0xFF45E07A) else Color(0xFFF2B33D)),
+        )
+        Text(
+            text = buildString {
+                append(stats.codec)
+                append(" · ")
+                append(stats.transport)
+                if (stats.fps > 0) {
+                    append(" · ")
+                    append("%.0f fps".format(stats.fps))
+                }
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFFE8EAED),
+        )
+        Text(
+            "▾",
+            color = Color(0xFFB9C2CB),
+            fontSize = 11.sp,
+            modifier = Modifier.padding(end = 2.dp),
+        )
+    }
+}
+
+/** 展开态性能抽屉(底部磨砂,不遮挡画面主体)。 */
+@Composable
+private fun BoxScope.StatsDock(
     state: ConsoleUiState,
     stats: StatsUi,
-    expanded: Boolean,
     hazeState: HazeState,
     isDark: Boolean,
     keyboardOffset: Dp,
-    onExpanded: (Boolean) -> Unit,
+    onCollapse: () -> Unit,
 ) {
-    if (!expanded) {
-        Row(
+    GlassPanel(
+        isDark = true,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp + keyboardOffset)
+            .fillMaxWidth(),
+        tint = Color(0xFF050607),
+        tintAlphaOverride = 0.55f,
+        blurOverride = 18.dp,
+        hazeState = hazeState,
+    ) {
+        Column(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color.Black.copy(alpha = 0.72f))
-                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
-                .clickable { onExpanded(true) }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(if (state.phase == Phase.STREAMING) Color(0xFF45E07A) else Color(0xFFF2B33D)),
-            )
-            Text(
-                text = buildString {
-                    append(stats.codec)
-                    append(" · ")
-                    append(stats.transport)
-                    if (stats.fps > 0) {
-                        append(" · ")
-                        append("%.0f fps".format(stats.fps))
-                    }
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFE8EAED),
-            )
-            Text(
-                text = "▾",
-                color = Color(0xFFB9C2CB),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(end = 2.dp),
-            )
-        }
-    } else {
-        GlassPanel(
-            isDark = true,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp + keyboardOffset)
-                .fillMaxWidth(),
-            tint = Color(0xFF050607),
-            tintAlphaOverride = 0.55f,
-            blurOverride = 18.dp,
-            hazeState = hazeState,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-            RefractionHighlight(Modifier.align(Alignment.CenterHorizontally), isDark = true)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("性能", style = MaterialTheme.typography.titleSmall, color = Color.White)
-                StatsChip("${stats.codec} · ${stats.transport}")
-                if (state.videoFormatKnown) StatsChip("${state.videoWidth}×${state.videoHeight}")
-                Spacer(Modifier.weight(1f))
-                if (stats.fps > 0) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color(0xFF45E07A).copy(alpha = 0.14f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        Text(
-                            "%.0f fps".format(stats.fps),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF45E07A),
-                        )
-                    }
-                }
-                IconButton(onClick = { onExpanded(false) }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "收起性能",
-                        tint = Color.White.copy(alpha = 0.75f),
-                        modifier = Modifier.size(16.dp),
+        RefractionHighlight(Modifier.align(Alignment.CenterHorizontally), isDark = true)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("性能", style = MaterialTheme.typography.titleSmall, color = Color.White)
+            StatsChip("${stats.codec} · ${stats.transport}")
+            if (state.videoFormatKnown) StatsChip("${state.videoWidth}×${state.videoHeight}")
+            Spacer(Modifier.weight(1f))
+            if (stats.fps > 0) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xFF45E07A).copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        "%.0f fps".format(stats.fps),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF45E07A),
                     )
                 }
             }
-            StatsGrid(stats, if (state.videoFormatKnown) "${state.videoWidth}×${state.videoHeight}" else "—")
-            Sparkline("实时帧率", stats.historyFps) { "%.0f fps".format(it) }
-            Sparkline("码率", stats.historyKbps) { "%.0f kbps".format(it) }
-            Sparkline("总测延迟", stats.historyMs) { "%.0f ms".format(it) }
+            IconButton(onClick = onCollapse, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "收起性能",
+                    tint = Color.White.copy(alpha = 0.75f),
+                    modifier = Modifier.size(16.dp),
+                )
             }
+        }
+        StatsGrid(stats, if (state.videoFormatKnown) "${state.videoWidth}×${state.videoHeight}" else "—")
+        Sparkline("实时帧率", stats.historyFps) { "%.0f fps".format(it) }
+        Sparkline("码率", stats.historyKbps) { "%.0f kbps".format(it) }
+        Sparkline("总测延迟", stats.historyMs) { "%.0f ms".format(it) }
         }
     }
 }

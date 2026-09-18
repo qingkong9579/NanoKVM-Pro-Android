@@ -13,3 +13,6 @@ keystore.properties
 *.keystore
 nanokvm-release.keystore
 "*.log" ; echo "build_log.txt"  
+build_log.txt
+rel_log.txt
+*.log

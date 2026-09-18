@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -95,38 +98,28 @@ fun ConnectScreen(
         Box(Modifier.matchParentSize().haze(hazeState)) {
             DotGridBackground(Modifier.fillMaxSize())
         }
-        // 右上角日夜切换(全局主题开关入口,置于底纹之上)
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(4.dp),
-        ) {
-            IconButton(onClick = onToggleTheme) {
-                Icon(
-                    if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                    contentDescription = if (isDark) "切换浅色" else "切换深色",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-        // 磨砂玻璃卡(高斯模糊采样点阵底纹)。
+        // 全屏磨砂玻璃(design-v2):整屏一层玻璃,表单居中其上。
         GlassPanel(
             isDark = isDark,
-            shape = GlassShapes.card,
-            modifier = Modifier
-                .padding(16.dp)
-                .widthIn(max = 480.dp)
-                .shadow(if (isDark) 10.dp else 4.dp, GlassShapes.card),
+            shape = RectangleShape,
+            modifier = Modifier.matchParentSize(),
             tint = if (isDark) Color(0xFF0E0F11) else Color.White,
-            tintAlphaOverride = if (isDark) 0.30f else 0.55f,
+            tintAlphaOverride = if (isDark) 0.42f else 0.62f,
             hazeState = hazeState,
         ) {
             RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
             Column(
                 modifier = Modifier
+                    .widthIn(max = 480.dp)
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -295,6 +288,22 @@ fun ConnectScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            }
+            }
+        }
+        // 右上角日夜切换(置于玻璃之上)
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(4.dp),
+        ) {
+            IconButton(onClick = onToggleTheme) {
+                Icon(
+                    if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                    contentDescription = if (isDark) "切换浅色" else "切换深色",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
     }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.FlowRow
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -88,6 +90,7 @@ import com.nanokvm.app.ui.theme.GlassShapes
 import com.nanokvm.app.ui.theme.GlassPanel
 import com.nanokvm.app.ui.theme.GlassTokens
 import com.nanokvm.app.ui.theme.RefractionHighlight
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -97,10 +100,11 @@ import kotlin.math.roundToInt
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ConsoleToolsSheet(
+fun BoxScope.ConsoleToolsSheet(
     state: ConsoleUiState,
     viewModel: ConsoleViewModel,
     isDark: Boolean,
+    hazeState: HazeState,
     onOpenTerminal: (com.nanokvm.app.ui.terminal.TerminalRequest) -> Unit = {},
     onOpenAssistant: () -> Unit = {},
 ) {
@@ -153,27 +157,31 @@ fun ConsoleToolsSheet(
 
     fun busyOrError(): String? = busyText ?: errorText
 
-    ModalBottomSheet(
-        onDismissRequest = { viewModel.toggleToolsSheet() },
-        shape = GlassShapes.sheet,
-        containerColor = Color.Transparent,
-        dragHandle = null,
+    // scrim:点空白处关闭
+    Box(
+        Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(alpha = 0.40f))
+            .clickable { viewModel.toggleToolsSheet() },
+    )
+    GlassPanel(
+        isDark = isDark,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f),
+        tint = if (isDark) Color(0xFF0E0F11) else Color.White,
+        tintAlphaOverride = if (isDark) 0.55f else 0.80f,
+        hazeState = hazeState,
     ) {
-        GlassPanel(
-            isDark = isDark,
-            shape = GlassShapes.sheet,
-            modifier = Modifier.fillMaxWidth(),
-            tint = if (isDark) Color(0xFF0E0F11) else Color.White,
-            tintAlphaOverride = if (isDark) 0.86f else 0.94f,
-        ) {
         RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
         Column(
             modifier = Modifier
-                .widthIn(max = 720.dp)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp, top = 6.dp),
+                .padding(bottom = 24.dp, top = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
@@ -534,7 +542,6 @@ fun ConsoleToolsSheet(
             Spacer(Modifier.height(12.dp))
         }
         }
-    }
 
     // ---- nested dialogs ----
     if (confirmAction != null) {
