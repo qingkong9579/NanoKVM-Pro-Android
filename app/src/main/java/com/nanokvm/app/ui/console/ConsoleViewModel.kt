@@ -71,6 +71,9 @@ data class StatsUi(
  * device coordinates and forwards every change as a full 6-byte report (matching
  * the web: buttons are re-stated with each move).
  */
+/** 控制台互斥面板:同一时间只开一个(高亮跟随)。 */
+enum class ConsolePanel { SETTINGS, TOOLS, STATS, KEYBOARD }
+
 class ConsoleViewModel(
     host: String,
     private val username: String,
@@ -155,6 +158,27 @@ class ConsoleViewModel(
     /** Toggles the One-KVM-style performance overlay. */
     fun toggleStats() {
         _state.value = _state.value.copy(statsVisible = !_state.value.statsVisible)
+    }
+
+    /**
+     * 互斥面板(design S03):同一时间只允许一个功能面板打开。
+     * 打开一个新的会自动关闭其他已打开的面板;传 null 全部关闭。
+     */
+    fun activatePanel(panel: ConsolePanel?) {
+        _state.value = _state.value.copy(
+            settingsSheetOpen = panel == ConsolePanel.SETTINGS,
+            toolsSheetOpen = panel == ConsolePanel.TOOLS,
+            statsVisible = panel == ConsolePanel.STATS,
+            vkbVisible = panel == ConsolePanel.KEYBOARD,
+        )
+    }
+
+    fun activePanel(): ConsolePanel? = when {
+        _state.value.settingsSheetOpen -> ConsolePanel.SETTINGS
+        _state.value.toolsSheetOpen -> ConsolePanel.TOOLS
+        _state.value.statsVisible -> ConsolePanel.STATS
+        _state.value.vkbVisible -> ConsolePanel.KEYBOARD
+        else -> null
     }
 
     /** 1 Hz sampling of transport counters → fps / bitrate / latency + history curves. */

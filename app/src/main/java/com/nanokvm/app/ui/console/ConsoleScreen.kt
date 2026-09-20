@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -323,9 +325,11 @@ private fun TopBar(
 
 @Composable
 private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark: Boolean) {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .background(MaterialTheme.colorScheme.surface),
+    val scroll = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface),
     ) {
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -335,28 +339,28 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp),
+                .horizontalScroll(scroll)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ActionIcon(Icons.Outlined.Settings, "设置(视频流/鼠标模式)", "设置") { viewModel.toggleSettingsSheet() }
-            ActionIcon(Icons.Outlined.Mouse, "鼠标模式", "鼠标") {
+            // 磨砂胶囊(design S03):圆角矩形,激活态青色高亮;互斥面板不堆叠
+            ActionCapsule(Icons.Outlined.Settings, "设置", isDark = isDark, active = state.settingsSheetOpen) {
+                viewModel.activatePanel(if (state.settingsSheetOpen) null else ConsolePanel.SETTINGS)
+            }
+            ActionCapsule(Icons.Outlined.Mouse, "鼠标", isDark = isDark) {
                 viewModel.setMouseMode(if (state.mouseMode == HidMouseMode.ABSOLUTE) HidMouseMode.RELATIVE else HidMouseMode.ABSOLUTE)
             }
-            ActionIcon(Icons.Outlined.Keyboard, "虚拟键盘", "键盘", active = state.vkbVisible, isDark = isDark) { viewModel.toggleVirtualKeyboard() }
-            ActionIcon(Icons.Outlined.Handyman, "工具箱", "工具箱") { viewModel.toggleToolsSheet() }
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(8.dp))
-            // Neutral vertical hairline between the two action groups.
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(16.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            ActionIcon(Icons.Outlined.BarChart, "性能", "性能", active = state.statsVisible, isDark = isDark) { viewModel.toggleStats() }
-            ActionIcon(Icons.Outlined.Refresh, "重新连接", "重连") { viewModel.reconnect() }
+            ActionCapsule(Icons.Outlined.Keyboard, "键盘", isDark = isDark, active = state.vkbVisible) {
+                viewModel.activatePanel(if (state.vkbVisible) null else ConsolePanel.KEYBOARD)
+            }
+            ActionCapsule(Icons.Outlined.Handyman, "工具箱", isDark = isDark, active = state.toolsSheetOpen) {
+                viewModel.activatePanel(if (state.toolsSheetOpen) null else ConsolePanel.TOOLS)
+            }
+            ActionCapsule(Icons.Outlined.BarChart, "性能", isDark = isDark, active = state.statsVisible) {
+                viewModel.activatePanel(if (state.statsVisible) null else ConsolePanel.STATS)
+            }
+            ActionCapsule(Icons.Outlined.Refresh, "重连", isDark = isDark) { viewModel.reconnect() }
         }
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -366,37 +370,46 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark
     }
 }
 
+/** 圆角矩形磨砂胶囊:图标 + 文字横排;激活态青色高亮(dark)/主色高亮(light)。 */
 @Composable
-private fun ActionIcon(
+private fun ActionCapsule(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    caption: String,
+    isDark: Boolean,
     active: Boolean = false,
-    isDark: Boolean = true,
     onClick: () -> Unit,
 ) {
-    // 激活态(design-v2):青色玻璃底 + 青色内容,标记 开启中的面板(键盘/性能)。
-    val activeBg = if (isDark) Color(0xFF7BE7FF).copy(alpha = 0.12f) else Color(0xFF2F6FED).copy(alpha = 0.10f)
-    val activeFg = if (isDark) Color(0xFF7BE7FF) else Color(0xFF2F6FED)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val accent = if (isDark) Color(0xFF7BE7FF) else MaterialTheme.colorScheme.primary
+    val bg = if (active) {
+        accent.copy(alpha = if (isDark) 0.14f else 0.12f)
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.06f else 0.05f)
+    }
+    val border = if (active) {
+        accent.copy(alpha = if (isDark) 0.45f else 0.35f)
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.08f)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier
-            .widthIn(min = 40.dp)
-            .then(if (active) Modifier.background(activeBg, RoundedCornerShape(10.dp)) else Modifier),
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 7.dp),
     ) {
-        IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
-            Icon(
-                icon,
-                contentDescription = label,
-                modifier = Modifier.size(20.dp),
-                tint = if (active) activeFg else MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Icon(
+            icon,
+            contentDescription = label,
+            modifier = Modifier.size(17.dp),
+            tint = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
-            text = caption,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (active) activeFg else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
