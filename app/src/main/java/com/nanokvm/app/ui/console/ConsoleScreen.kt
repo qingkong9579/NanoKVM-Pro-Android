@@ -1062,11 +1062,13 @@ private fun BoxScope.SettingsSheet(
             val mode = state.streamMode
             val codec = if (mode.startsWith("h265")) "h265" else "h264"
             val transport = if (mode.endsWith("webrtc")) "webrtc" else "direct"
+            Text("编码", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
             SegmentedButtons(
                 options = listOf("H.264" to "h264", "H.265" to "h265"),
                 selected = codec,
                 onSelect = { viewModel.setStreamMode("$it-$transport") },
             )
+            Text("传输", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
             SegmentedButtons(
                 options = listOf("直连" to "direct", "WebRTC" to "webrtc"),
                 selected = transport,
@@ -1111,10 +1113,11 @@ private fun BoxScope.SettingsSheet(
             }
             Text("鼠标模式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SegmentedButtons(
-                options = listOf("绝对" to HidMouseMode.ABSOLUTE, "相对" to HidMouseMode.RELATIVE),
+                options = listOf("绝对 · 点哪指哪" to HidMouseMode.ABSOLUTE, "相对 · 拖动控制" to HidMouseMode.RELATIVE),
                 selected = state.mouseMode,
                 onSelect = viewModel::setMouseMode,
             )
+            Text("切换编码 / 传输将重建视频流,约 2–4 秒", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(
                 onClick = { viewModel.toggleSettingsSheet(); viewModel.reconnect() },
                 modifier = Modifier

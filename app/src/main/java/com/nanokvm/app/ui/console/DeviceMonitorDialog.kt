@@ -26,8 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -200,25 +201,31 @@ private fun MiniChart(
     val last = valid.lastOrNull()
     // 与「性能」面板同款 uPlot 风:细线 + 10% 同色填充 + 细网格,数值灰
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)),
+        ) {
             Text(
                 title,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 8.dp, top = 4.dp),
             )
-            Spacer(Modifier.weight(1f))
             Text(
                 if (last != null) fmt(last) else "—",
                 style = MaterialTheme.typography.labelMedium,
                 color = OneKvmMonitorText,
                 fontFamily = FontFamily.Monospace,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 8.dp, top = 3.dp),
             )
-        }
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp),
-        ) {
+            Canvas(modifier = Modifier.matchParentSize()) {
             val w = size.width
             val h = size.height
             val minV: Float
@@ -279,6 +286,7 @@ private fun MiniChart(
                 // 实时端点:最新采样加光点
                 drawCircle(color.copy(alpha = 0.25f), radius = 4.5f, center = Offset(lastX, lastY))
                 drawCircle(color, radius = 2.2f, center = Offset(lastX, lastY))
+            }
             }
         }
     }

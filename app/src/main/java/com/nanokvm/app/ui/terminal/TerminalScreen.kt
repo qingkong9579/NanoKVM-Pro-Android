@@ -8,6 +8,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material3.AlertDialog
@@ -82,7 +84,7 @@ fun TerminalScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding(),
     ) {
-        // 极简顶栏:左标题(终端 · host)、右退出;48dp,surface 底 + hairline
+        // 极简顶栏:标题(按入口类型)+ 状态标签 + 退出;48dp,surface 底 + hairline
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -93,38 +95,63 @@ fun TerminalScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                if (host.isBlank()) "终端" else "终端 · $host",
+                when (request.kind) {
+                    TerminalKind.SHELL -> "Shell"
+                    TerminalKind.SERIAL -> "串口"
+                    TerminalKind.ASSISTANT_INSTALL -> "助手安装"
+                },
                 style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            when (event) {
-                is TerminalEvent.Reconnecting -> Text(
-                    "重连中 ${(event as TerminalEvent.Reconnecting).attempt}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                is TerminalEvent.Error -> Text(
-                    "连接错误",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                is TerminalEvent.AuthRequired -> Text(
-                    "需 SSH 校验",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                else -> {}
+            // 状态标签(design S10):绿=已连接,黄=重连,红=错误
+            val (tagText, tagColor) = when (event) {
+                is TerminalEvent.Reconnecting -> "重连中" to MaterialTheme.colorScheme.onSurfaceVariant
+                is TerminalEvent.Error -> "错误" to MaterialTheme.colorScheme.error
+                is TerminalEvent.AuthRequired -> "需 SSH 校验" to MaterialTheme.colorScheme.onSurfaceVariant
+                else -> "已连接" to MaterialTheme.colorScheme.primary
             }
+            Text(
+                tagText,
+                style = MaterialTheme.typography.labelSmall,
+                color = tagColor,
+                modifier = Modifier
+                    .border(1.dp, tagColor.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            )
             IconButton(onClick = { vm.stop(); onExit() }, modifier = Modifier.size(40.dp)) {
                 Icon(Icons.AutoMirrored.Outlined.ExitToApp, "退出终端", Modifier.size(20.dp))
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        // 终端区:全黑沉浸,无内边距/圆角/边框
+        // 终端区:全黑沉浸,无内边距/圆角/边框;重连时顶部退避提示条
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             TerminalWebView(vm)
+            if (event is TerminalEvent.Reconnecting) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                        .background(Color(0xFF2A2410), RoundedCornerShape(9.dp))
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                ) {
+                    Text("⚠", color = Color(0xFFF2B33D))
+                    Text(
+                        when (val e = event) {
+                            is TerminalEvent.Reconnecting ->
+                                "连接断开 · 指数退避第 ${(e as TerminalEvent.Reconnecting).attempt} 次,自动重试中"
+                            is TerminalEvent.Error -> "错误:${(e as TerminalEvent.Error).message}"
+                            else -> "连接中断"
+                        },
+                        color = Color(0xFFF2B33D),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
             if (event == null || event is TerminalEvent.Reconnecting) {
                 CircularProgressIndicator(
                     Modifier.align(Alignment.Center).size(28.dp),
