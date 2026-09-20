@@ -428,6 +428,11 @@ class ConsoleViewModel(
 
     // ---- relative mouse & quick combos (web parity) ----
     fun mouseRelativeMove(dxPx: Float, dyPx: Float) = hidHost?.mouseRelativeMove(dxPx, dyPx)
+
+    // ---- 模拟触控板:始终相对报文,无视客户端鼠标模式 ----
+    fun touchpadMove(dxPx: Float, dyPx: Float) = hidHost?.touchpadMove(dxPx, dyPx)
+    fun touchpadButton(button: Int, down: Boolean) = hidHost?.touchpadButton(button, down)
+    fun touchpadWheel(ticks: Int) = hidHost?.touchpadWheel(ticks * _state.value.wheelDir)
     fun sendCombo(modifiers: Int, usages: List<Int>) = hidHost?.combo(modifiers, usages)
 
     /** 设备端逐字符粘贴(web paste:POST /api/hid/paste,≤1024)。 */
@@ -599,6 +604,29 @@ private class HidHost(
      */
     fun mouseRelativeMove(dxPx: Float, dyPx: Float) {
         if (!isRelative) return
+        sendRelativeMove(dxPx, dyPx)
+    }
+
+    /**
+     * 触控板通路:无视客户端鼠标模式,始终发相对报文。
+     * 设备 HID WS 同时接受绝对 6B/相对 4B 两种格式(HANDOFF §2),无需切模式/重连。
+     */
+    fun touchpadMove(dxPx: Float, dyPx: Float) = sendRelativeMove(dxPx, dyPx)
+
+    /** 触控板按键:相对帧只带按键位,零位移 — 光标停在当前位置,不依赖 lastX/lastY。 */
+    fun touchpadButton(button: Int, down: Boolean) {
+        buttons = if (down) buttons or button else buttons and button.inv()
+        session.sendMouse(MouseCodec.relative(buttons, 0, 0, 0))
+    }
+
+    /** 触控板滚轮:相对帧带 wheel tick,随后补一帧归零(与 mouseWheel 同型)。 */
+    fun touchpadWheel(ticks: Int) {
+        val t = ticks.coerceIn(-127, 127)
+        session.sendMouse(MouseCodec.relative(buttons, 0, 0, t))
+        session.sendMouse(MouseCodec.relative(buttons, 0, 0, 0))
+    }
+
+    private fun sendRelativeMove(dxPx: Float, dyPx: Float) {
         var dx = dxPx
         var dy = dyPx
         if (abs(dx) < 10f && abs(dy) < 10f) {

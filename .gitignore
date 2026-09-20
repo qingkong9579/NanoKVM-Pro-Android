@@ -16,3 +16,5 @@ nanokvm-release.keystore
 build_log.txt
 rel_log.txt
 *.log
+"build_*_log.txt"  
+".scratch/"  

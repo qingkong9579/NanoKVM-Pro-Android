@@ -184,12 +184,12 @@ fun ConsoleScreen(
                 isDark = isDark,
                 hazeState = hazeState,
                 modifier = Modifier.navigationBarsPadding(),
-                onMove = viewModel::mouseRelativeMove,
-                onWheel = { ticks -> viewModel.mouseWheel(ticks) },
-                onLeftDown = { viewModel.mouseButton(MouseButton.LEFT, true) },
-                onLeftUp = { viewModel.mouseButton(MouseButton.LEFT, false) },
-                onRightDown = { viewModel.mouseButton(MouseButton.RIGHT, true) },
-                onRightUp = { viewModel.mouseButton(MouseButton.RIGHT, false) },
+                onMove = viewModel::touchpadMove,
+                onWheel = viewModel::touchpadWheel,
+                onLeftDown = { viewModel.touchpadButton(MouseButton.LEFT, true) },
+                onLeftUp = { viewModel.touchpadButton(MouseButton.LEFT, false) },
+                onRightDown = { viewModel.touchpadButton(MouseButton.RIGHT, true) },
+                onRightUp = { viewModel.touchpadButton(MouseButton.RIGHT, false) },
             )
         }
         if (state.settingsSheetOpen) {

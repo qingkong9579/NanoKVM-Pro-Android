@@ -111,6 +111,14 @@ class SessionController(
     private val streamParams = StreamParams()
 
     /**
+     * 已成功写入设备的流模式。断线重连时若模式未变则跳过 configureStream —
+     * 设备流会话活跃/收尾期间会拒绝参数写入("set rate control failed",code -3),
+     * 而参数本就持久保留在设备上,重放只会制造随机连接失败。
+     */
+    @Volatile
+    private var configuredMode: String? = null
+
+    /**
      * 应用流参数并重启视频传输,使编码器以新参数重新初始化。
      * 固件对 quality/bitrate 只写内存字段、运行中的编码器不读;rate-control/GOP/FPS
      * 有原生 setter(实时),重启统一保证全部生效。返回 null=成功 / 错误消息。
@@ -123,25 +131,35 @@ class SessionController(
     ): String? {
         try {
             if (rateControl != null && rateControl != streamParams.rateControl) {
-                api.setRateControl(rateControl)
+                postParamRetry { api.setRateControl(rateControl) }
                 streamParams.rateControl = rateControl
             }
             if (bitrateKbps != null && bitrateKbps != streamParams.bitrateKbps) {
-                api.setQuality(bitrateKbps)
+                postParamRetry { api.setQuality(bitrateKbps) }
                 streamParams.bitrateKbps = bitrateKbps
             }
             if (gop != null && gop != streamParams.gop) {
-                api.setGop(gop)
+                postParamRetry { api.setGop(gop) }
                 streamParams.gop = gop
             }
             if (fps != null && fps != streamParams.fps) {
-                api.setFps(fps)
+                postParamRetry { api.setFps(fps) }
                 streamParams.fps = fps
             }
             restartVideoTransport()
             return null
         } catch (e: Exception) {
             return e.message ?: "设置失败"
+        }
+    }
+
+    /** 设备流会话活跃/收尾窗口会短暂拒绝参数写入(code -3)— 单次退避重试。 */
+    private suspend fun postParamRetry(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: Exception) {
+            kotlinx.coroutines.delay(800)
+            block()
         }
     }
 
@@ -191,7 +209,9 @@ class SessionController(
 
                 // Mode must precede opening the matching route or the streamer loops
                 // forever on a type mismatch (the classic permanent black screen).
-                configureStream(streamMode)
+                if (configuredMode != streamMode) {
+                    configureStream(streamMode)
+                }
                 emit(SessionEvent.Configured(streamMode))
 
                 // NOTE: mouse absolute/relative is a client-side preference (the web's
@@ -212,10 +232,13 @@ class SessionController(
     /** Applies mode + the user's current stream parameters (defaults until changed). */
     private suspend fun configureStream(streamMode: String) {
         api.setStreamMode(streamMode)
-        api.setRateControl(streamParams.rateControl)
-        api.setQuality(streamParams.bitrateKbps)
-        api.setGop(streamParams.gop)
-        api.setFps(streamParams.fps)
+        // rate-control/quality/gop/fps 在设备流会话未完全释放时会被拒(code -3)。
+        // 参数在设备端持久保留,失败不致命 — 记录后继续建流,下次换模式时会重试。
+        runCatching { api.setRateControl(streamParams.rateControl) }
+        runCatching { api.setQuality(streamParams.bitrateKbps) }
+        runCatching { api.setGop(streamParams.gop) }
+        runCatching { api.setFps(streamParams.fps) }
+        configuredMode = streamMode
     }
 
     private fun openVideoTransport() {
