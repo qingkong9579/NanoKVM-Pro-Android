@@ -14,8 +14,8 @@ android {
         applicationId = "com.nanokvm.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.1.4-hotfix"
+        versionCode = 7
+        versionName = "0.1.5"
     }
 
     signingConfigs {
