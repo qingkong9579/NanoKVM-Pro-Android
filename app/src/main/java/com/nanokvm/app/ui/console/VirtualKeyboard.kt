@@ -111,7 +111,7 @@ fun VirtualKeyboard(
     GlassPanel(
         isDark = isDark,
         shape = RectangleShape,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth(),
         tint = if (isDark) Color(0xFF0E0F11) else Color(0xFFF0F1F3),
         tintAlphaOverride = if (isDark) 0.30f else 0.55f,

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -171,6 +172,7 @@ fun ConsoleScreen(
                 isDark = isDark,
                 activeModifiers = state.activeModifiers,
                 hazeState = hazeState,
+                modifier = Modifier.navigationBarsPadding(),
                 onKeyDown = viewModel::vkbKeyDown,
                 onKeyUp = viewModel::vkbKeyUp,
                 onModifierToggle = viewModel::vkbModifierToggle,
@@ -181,6 +183,7 @@ fun ConsoleScreen(
             TouchpadPanel(
                 isDark = isDark,
                 hazeState = hazeState,
+                modifier = Modifier.navigationBarsPadding(),
                 onMove = viewModel::mouseRelativeMove,
                 onWheel = { ticks -> viewModel.mouseWheel(ticks) },
                 onLeftDown = { viewModel.mouseButton(MouseButton.LEFT, true) },
