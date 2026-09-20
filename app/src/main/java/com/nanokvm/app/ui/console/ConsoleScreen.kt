@@ -345,22 +345,22 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             // 磨砂胶囊(design S03):圆角矩形,激活态青色高亮;互斥面板不堆叠
-            ActionCapsule(Icons.Outlined.Settings, "设置", isDark = isDark, active = state.settingsSheetOpen) {
+            ActionCapsule("设置", isDark = isDark, active = state.settingsSheetOpen) {
                 viewModel.activatePanel(if (state.settingsSheetOpen) null else ConsolePanel.SETTINGS)
             }
-            ActionCapsule(Icons.Outlined.Mouse, "鼠标", isDark = isDark) {
+            ActionCapsule("鼠标", isDark = isDark) {
                 viewModel.setMouseMode(if (state.mouseMode == HidMouseMode.ABSOLUTE) HidMouseMode.RELATIVE else HidMouseMode.ABSOLUTE)
             }
-            ActionCapsule(Icons.Outlined.Keyboard, "键盘", isDark = isDark, active = state.vkbVisible) {
+            ActionCapsule("键盘", isDark = isDark, active = state.vkbVisible) {
                 viewModel.activatePanel(if (state.vkbVisible) null else ConsolePanel.KEYBOARD)
             }
-            ActionCapsule(Icons.Outlined.Handyman, "工具箱", isDark = isDark, active = state.toolsSheetOpen) {
+            ActionCapsule("工具箱", isDark = isDark, active = state.toolsSheetOpen) {
                 viewModel.activatePanel(if (state.toolsSheetOpen) null else ConsolePanel.TOOLS)
             }
-            ActionCapsule(Icons.Outlined.BarChart, "性能", isDark = isDark, active = state.statsVisible) {
+            ActionCapsule("性能", isDark = isDark, active = state.statsVisible) {
                 viewModel.activatePanel(if (state.statsVisible) null else ConsolePanel.STATS)
             }
-            ActionCapsule(Icons.Outlined.Refresh, "重连", isDark = isDark) { viewModel.reconnect() }
+            ActionCapsule("重连", isDark = isDark) { viewModel.reconnect() }
         }
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -373,7 +373,6 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark
 /** 圆角矩形磨砂胶囊:图标 + 文字横排;激活态青色高亮(dark)/主色高亮(light)。 */
 @Composable
 private fun ActionCapsule(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     isDark: Boolean,
     active: Boolean = false,
@@ -392,20 +391,13 @@ private fun ActionCapsule(
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            modifier = Modifier.size(17.dp),
-            tint = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
