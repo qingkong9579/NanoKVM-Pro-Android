@@ -1,6 +1,7 @@
 package com.nanokvm.app.ui.console
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Monitor
@@ -50,6 +52,7 @@ import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -74,10 +77,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nanokvm.app.data.api.DeviceInfo
@@ -89,6 +95,7 @@ import com.nanokvm.app.ui.components.SegmentedButtons
 import com.nanokvm.app.ui.theme.GlassShapes
 import com.nanokvm.app.ui.theme.GlassPanel
 import com.nanokvm.app.ui.theme.GlassTokens
+import com.nanokvm.app.ui.theme.OneKvmColors
 import com.nanokvm.app.ui.theme.RefractionHighlight
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
@@ -112,6 +119,9 @@ fun BoxScope.ConsoleToolsSheet(
     val rest = viewModel.toolsRest
     var confirmAction by remember { mutableStateOf<(suspend () -> String?)?>(null) }
     var confirmTitle by remember { mutableStateOf("") }
+    var confirmDesc by remember { mutableStateOf<String?>(null) }
+    var confirmParams by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var confirmWarn by remember { mutableStateOf(false) }
     var busyText by remember { mutableStateOf<String?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var showInfo by remember { mutableStateOf(false) }
@@ -150,8 +160,17 @@ fun BoxScope.ConsoleToolsSheet(
         }
     }
 
-    fun confirm(title: String, action: suspend () -> String?) {
+    fun confirm(
+        title: String,
+        desc: String? = null,
+        params: List<Pair<String, String>> = emptyList(),
+        warn: Boolean = true,
+        action: suspend () -> String?,
+    ) {
         confirmTitle = title
+        confirmDesc = desc
+        confirmParams = params
+        confirmWarn = warn
         confirmAction = { action() }
     }
 
@@ -224,21 +243,33 @@ fun BoxScope.ConsoleToolsSheet(
             }
             if (!managePage) {
                 // ============ 操作:会话内操控 ============
+                // 入口大卡(design S07):最高频动作上浮为彩色玻璃卡
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    EntryCard(
+                        icon = Icons.Outlined.Terminal,
+                        title = "终端",
+                        subtitle = "root shell · 串口",
+                        accent = Color(0xFF7BE7FF),
+                        onClick = {
+                            scope.launch {
+                                onOpenTerminal(com.nanokvm.app.ui.terminal.TerminalRequest(com.nanokvm.app.ui.terminal.TerminalKind.SHELL))
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    EntryCard(
+                        icon = Icons.Outlined.AutoAwesome,
+                        title = "智能助手",
+                        subtitle = "AI 看着屏幕执行键鼠任务",
+                        accent = OneKvmColors.SuccessBright,
+                        onClick = { scope.launch { showAssistant = true } },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 SectionHeader("常用")
-                ToolRow(
-                    icon = Icons.Outlined.Terminal,
-                    title = "NanoKVM 终端",
-                    subtitle = "进入设备命令行",
-                    onClick = {
-                        scope.launch { onOpenTerminal(com.nanokvm.app.ui.terminal.TerminalRequest(com.nanokvm.app.ui.terminal.TerminalKind.SHELL)) }
-                    },
-                )
-                ToolRow(
-                    icon = Icons.Outlined.AutoAwesome,
-                    title = "智能助手",
-                    subtitle = "AI 看着屏幕执行键鼠任务",
-                    onClick = { scope.launch { showAssistant = true } },
-                )
                 ToolRow(
                     icon = Icons.Outlined.Usb,
                     title = "串口终端",
@@ -411,7 +442,11 @@ fun BoxScope.ConsoleToolsSheet(
                     title = "重置 HID",
                     subtitle = "键鼠无响应时复位 USB HID",
                     onClick = {
-                        confirm("重置 HID?约 3 秒内键鼠不可用") {
+                        confirm(
+                            "重置 HID",
+                            "键鼠将断开约 3 秒后自动恢复。",
+                            listOf("操作" to "usb · hid-reset"),
+                        ) {
                             var done = false
                             var msg: String? = null
                             viewModel.resetHidDevice { msg = it; done = true }
@@ -428,7 +463,11 @@ fun BoxScope.ConsoleToolsSheet(
                     subtitle = "模拟一次电源键短按(800ms)",
                     danger = true,
                     onClick = {
-                        confirm("执行电源短按") { rest.gpioPower("power", 800).let { null } }
+                        confirm(
+                            "电源键短按",
+                            "模拟一次物理电源键短按。",
+                            listOf("操作" to "power · press 800ms"),
+                        ) { rest.gpioPower("power", 800).let { null } }
                     },
                 )
                 ToolRow(
@@ -446,7 +485,11 @@ fun BoxScope.ConsoleToolsSheet(
                         }
                     },
                     onClick = {
-                        confirm("电源键长按 ${longSeconds}s?") { rest.gpioPower("power", longSeconds * 1000).let { null } }
+                        confirm(
+                            "电源键长按",
+                            "被控机将强制关机,未保存的工作可能丢失。",
+                            listOf("操作" to "power · long-press", "时长" to "${longSeconds}s"),
+                        ) { rest.gpioPower("power", longSeconds * 1000).let { null } }
                     },
                 )
                 ToolRow(
@@ -455,23 +498,28 @@ fun BoxScope.ConsoleToolsSheet(
                     subtitle = "reset 键按下 800ms 复位主机",
                     danger = true,
                     onClick = {
-                        confirm("重启被控机") { rest.gpioPower("reset", 800).let { null } }
+                        confirm(
+                            "重启被控机",
+                            "reset 键按下 800ms,主机将立即重启。",
+                            listOf("操作" to "reset · press 800ms"),
+                        ) { rest.gpioPower("reset", 800).let { null } }
                     },
                 )
             } else {
                 // ============ 设备管理:设备级配置 ============
+                SectionHeader("健康")
+                ToolRow(
+                    icon = Icons.Outlined.BarChart,
+                    title = "设备监控",
+                    subtitle = "CPU / 内存 / 温度 实时曲线",
+                    onClick = { scope.launch { showMonitor = true } },
+                )
                 SectionHeader("信息与网络")
                 ToolRow(
                     icon = Icons.Outlined.Info,
                     title = "设备信息",
                     subtitle = "固件版本 / IP / 架构",
                     onClick = { scope.launch { showInfo = true } },
-                )
-                ToolRow(
-                    icon = Icons.Outlined.BarChart,
-                    title = "设备监控",
-                    subtitle = "CPU / 内存 / 温度 实时曲线",
-                    onClick = { scope.launch { showMonitor = true } },
                 )
                 ToolRow(
                     icon = Icons.Outlined.Settings,
@@ -535,7 +583,11 @@ fun BoxScope.ConsoleToolsSheet(
                     subtitle = "设备本体重启,连接将断开",
                     danger = true,
                     onClick = {
-                        confirm("重启 NanoKVM 设备?连接将中断") { rest.rebootSystem().let { null } }
+                        confirm(
+                            "重启 NanoKVM 系统",
+                            "设备本体重启,当前连接将中断。",
+                            listOf("操作" to "system · reboot"),
+                        ) { rest.rebootSystem().let { null } }
                     },
                 )
             }
@@ -545,16 +597,51 @@ fun BoxScope.ConsoleToolsSheet(
 
     // ---- nested dialogs ----
     if (confirmAction != null) {
+        // S13 统一确认壳层:标题 → 说明 → 参数摘要 → 危险提示 → 底部双按钮
         AlertDialog(
             onDismissRequest = { confirmAction = null },
-            title = { Text("确认操作", style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp)) },
-            text = { Text(confirmTitle, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp)) },
+            title = { Text("确认操作", style = MaterialTheme.typography.titleSmall) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(confirmTitle, style = MaterialTheme.typography.bodyMedium)
+                    confirmParams.forEach { (k, v) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                        ) {
+                            Text(k, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.weight(1f))
+                            Text(v, style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    if (confirmWarn) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.ErrorOutline,
+                                null,
+                                Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                            Text("此操作不可撤销", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    val a = confirmAction
-                    confirmAction = null
-                    scope.launch { run { a?.invoke() } }
-                }) { Text("执行") }
+                TextButton(
+                    onClick = {
+                        val a = confirmAction
+                        confirmAction = null
+                        scope.launch { run { a?.invoke() } }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("执行", fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmAction = null }) { Text("取消") }
@@ -672,6 +759,38 @@ private fun ActionChip(label: String, onClick: () -> Unit) {
 }
 
 /**
+ * 入口大卡(design S07):最高频动作上浮为彩色玻璃卡。
+ */
+@Composable
+private fun EntryCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(13.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(accent.copy(alpha = 0.10f), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)),
+                ),
+            )
+            .border(1.dp, accent.copy(alpha = 0.22f), RoundedCornerShape(13.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        Icon(icon, null, Modifier.size(20.dp), tint = accent)
+        Spacer(Modifier.height(8.dp))
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(2.dp))
+        Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
  * 二级参数选择行(v2 优化):图标底座 + 标题 + 右侧当前值一行;分段选择紧凑内嵌于下,
  * 整行高度压缩、视觉成组。
  */
@@ -770,9 +889,21 @@ private fun InfoDialog(rest: com.nanokvm.app.data.api.NanoKvmApi, onClose: () ->
             rows == null -> CircularProgressIndicator()
             else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 rows!!.forEach { (k, v) ->
-                    Row(Modifier.defaultMinSize(minHeight = 48.dp)) {
-                        Text(k, Modifier.width(64.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(v, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 48.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(k, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            v,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.End,
+                        )
                     }
                 }
             }

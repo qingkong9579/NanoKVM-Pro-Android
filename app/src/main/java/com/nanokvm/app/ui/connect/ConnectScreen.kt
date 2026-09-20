@@ -46,7 +46,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.SpanStyle
@@ -95,32 +98,48 @@ fun ConnectScreen(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        // 背景层 = haze 采样源(只含底纹;磨砂卡片与其同级,避免自引用)
+        // 环境光晕(design S01:AmbientTop/AmbientGlow)
+        Box(
+            Modifier
+                .matchParentSize()
+                .drawBehind {
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(Color(0x1A7BE7FF), Color.Transparent),
+                            center = Offset(size.width * 0.5f, 0f),
+                            radius = size.width * 1.15f,
+                        ),
+                    )
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(Color(0x142F6FED), Color.Transparent),
+                            center = Offset(size.width * 0.92f, size.height * 0.12f),
+                            radius = size.width * 0.95f,
+                        ),
+                    )
+                },
+        )
         Box(Modifier.matchParentSize().haze(hazeState)) {
             DotGridBackground(Modifier.fillMaxSize())
         }
-        // 全屏磨砂玻璃(design-v2):整屏一层玻璃,表单居中其上。
+        // 磨砂玻璃卡(design S01:居中卡片,高斯模糊采样点阵底纹)。
         GlassPanel(
             isDark = isDark,
-            shape = RectangleShape,
-            modifier = Modifier.matchParentSize(),
+            shape = GlassShapes.card,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(16.dp)
+                .widthIn(max = 358.dp)
+                .shadow(if (isDark) 10.dp else 4.dp, GlassShapes.card),
             tint = if (isDark) Color(0xFF0E0F11) else Color.White,
-            tintAlphaOverride = if (isDark) 0.42f else 0.62f,
+            tintAlphaOverride = if (isDark) 0.30f else 0.55f,
             hazeState = hazeState,
         ) {
             RefractionHighlight(Modifier.align(Alignment.TopCenter), isDark = isDark)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
-                contentAlignment = Alignment.Center,
-            ) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -287,7 +306,6 @@ fun ConnectScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
             }
             }
         }

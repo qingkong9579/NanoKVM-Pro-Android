@@ -134,55 +134,56 @@ fun ConsoleScreen(
 
     val hazeState = remember { HazeState() }
     var statsDock by rememberSaveable { mutableStateOf(false) }
-    // 沉浸式布局:视频层铺满全屏,顶部 chrome 与键盘以磨砂玻璃悬浮其上
-    Box(
+    // S03 结构(design-v2):顶部 chrome / 中部视频(haze 采样源)/ 底部键盘,三段分明
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding(),
     ) {
-        // 视频层 = haze 采样源(顶栏/工具条/键盘/dock 均对其磨砂)
-        Box(Modifier.fillMaxSize().haze(hazeState)) {
-            VideoStage(state, viewModel)
-        }
-        StageOverlays(state, viewModel)
-        Column(Modifier.fillMaxWidth()) {
-            Box(Modifier.statusBarsPadding()) {
-                TopBar(state, isDark, onToggleTheme, onBack, viewModel, hazeState)
+        TopBar(state, isDark, onToggleTheme, onBack, viewModel)
+        ActionBar(state, viewModel, isDark)
+        Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.fillMaxSize().haze(hazeState)) {
+                VideoStage(state, viewModel)
             }
-            ActionBar(state, viewModel, isDark, hazeState)
-            if (state.phase == Phase.CONNECTING) FlowLine(Modifier.fillMaxWidth())
-            // 收起态性能细条:始终悬在工具条正下方(右对齐)
+            StageOverlays(state, viewModel)
+            if (state.phase == Phase.CONNECTING) FlowLine(Modifier.align(Alignment.TopCenter).fillMaxWidth())
             if (state.statsVisible && !statsDock) {
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 12.dp),
+                ) {
                     Spacer(Modifier.weight(1f))
                     StatsStrip(state, stats) { statsDock = true }
                 }
             }
-        }
-        if (state.statsVisible && statsDock) {
-            StatsDock(state, stats, hazeState, isDark, keyboardOffset = if (state.vkbVisible) 260.dp else 0.dp) {
-                statsDock = false
+            if (state.statsVisible && statsDock) {
+                StatsDock(state, stats, hazeState) { statsDock = false }
             }
         }
         if (state.vkbVisible) {
-            // 对齐必须在调用处包一层 Box:透传进 VirtualKeyboard 内部的 align 会被丢弃
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                VirtualKeyboard(
-                    isDark = isDark,
-                    activeModifiers = state.activeModifiers,
-                    hazeState = hazeState,
-                    onKeyDown = viewModel::vkbKeyDown,
-                    onKeyUp = viewModel::vkbKeyUp,
-                    onModifierToggle = viewModel::vkbModifierToggle,
-                    onAction = viewModel::vkbAction,
-                )
-            }
+            VirtualKeyboard(
+                isDark = isDark,
+                activeModifiers = state.activeModifiers,
+                hazeState = hazeState,
+                onKeyDown = viewModel::vkbKeyDown,
+                onKeyUp = viewModel::vkbKeyUp,
+                onModifierToggle = viewModel::vkbModifierToggle,
+                onAction = viewModel::vkbAction,
+            )
         }
         if (state.settingsSheetOpen) {
-            SettingsSheet(state, viewModel, isDark, hazeState)
+            Box(Modifier.fillMaxSize()) {
+                SettingsSheet(state, viewModel, isDark, hazeState)
+            }
         }
         if (state.toolsSheetOpen) {
-            ConsoleToolsSheet(state, viewModel, isDark, hazeState, onOpenTerminal, onOpenAssistant)
+            Box(Modifier.fillMaxSize()) {
+                ConsoleToolsSheet(state, viewModel, isDark, hazeState, onOpenTerminal, onOpenAssistant)
+            }
         }
     }
 }
@@ -194,13 +195,12 @@ private fun TopBar(
     onToggleTheme: () -> Unit,
     onBack: () -> Unit,
     viewModel: ConsoleViewModel,
-    hazeState: HazeState,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .glassFrost(hazeState, isDark)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -322,10 +322,10 @@ private fun TopBar(
 }
 
 @Composable
-private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark: Boolean, hazeState: HazeState) {
+private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark: Boolean) {
     Column(modifier = Modifier
         .fillMaxWidth()
-        .glassFrost(hazeState, isDark),
+        .background(MaterialTheme.colorScheme.surface),
     ) {
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -676,8 +676,6 @@ private fun BoxScope.StatsDock(
     state: ConsoleUiState,
     stats: StatsUi,
     hazeState: HazeState,
-    isDark: Boolean,
-    keyboardOffset: Dp,
     onCollapse: () -> Unit,
 ) {
     GlassPanel(
@@ -685,7 +683,7 @@ private fun BoxScope.StatsDock(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp + keyboardOffset)
+            .padding(8.dp)
             .fillMaxWidth(),
         tint = Color(0xFF050607),
         tintAlphaOverride = 0.55f,
