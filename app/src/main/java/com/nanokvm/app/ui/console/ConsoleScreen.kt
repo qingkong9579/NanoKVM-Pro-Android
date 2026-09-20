@@ -177,6 +177,18 @@ fun ConsoleScreen(
                 onAction = viewModel::vkbAction,
             )
         }
+        if (state.touchpadVisible) {
+            TouchpadPanel(
+                isDark = isDark,
+                hazeState = hazeState,
+                onMove = viewModel::mouseRelativeMove,
+                onWheel = { ticks -> viewModel.mouseWheel(ticks) },
+                onLeftDown = { viewModel.mouseButton(MouseButton.LEFT, true) },
+                onLeftUp = { viewModel.mouseButton(MouseButton.LEFT, false) },
+                onRightDown = { viewModel.mouseButton(MouseButton.RIGHT, true) },
+                onRightUp = { viewModel.mouseButton(MouseButton.RIGHT, false) },
+            )
+        }
         if (state.settingsSheetOpen) {
             Box(Modifier.fillMaxSize()) {
                 SettingsSheet(state, viewModel, isDark, hazeState)
@@ -348,8 +360,8 @@ private fun ActionBar(state: ConsoleUiState, viewModel: ConsoleViewModel, isDark
             ActionCapsule(icon = Icons.Outlined.Settings, "设置", isDark = isDark, active = state.settingsSheetOpen) {
                 viewModel.activatePanel(if (state.settingsSheetOpen) null else ConsolePanel.SETTINGS)
             }
-            ActionCapsule(icon = Icons.Outlined.Mouse, "鼠标", isDark = isDark) {
-                viewModel.setMouseMode(if (state.mouseMode == HidMouseMode.ABSOLUTE) HidMouseMode.RELATIVE else HidMouseMode.ABSOLUTE)
+            ActionCapsule(icon = Icons.Outlined.Mouse, "触控板", isDark = isDark, active = state.touchpadVisible) {
+                viewModel.activatePanel(if (state.touchpadVisible) null else ConsolePanel.TOUCHPAD)
             }
             ActionCapsule(icon = Icons.Outlined.Keyboard, "键盘", isDark = isDark, active = state.vkbVisible) {
                 viewModel.activatePanel(if (state.vkbVisible) null else ConsolePanel.KEYBOARD)
@@ -942,6 +954,152 @@ private fun FlowLine(modifier: Modifier = Modifier) {
                 )
             },
     )
+}
+
+/** 模拟触控板(design):滑动=相对移动光标,双指=滚轮;下方物理左/右键(支持按住拖拽)。 */
+@Composable
+private fun TouchpadPanel(
+    isDark: Boolean,
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    onMove: (Float, Float) -> Unit,
+    onWheel: (Int) -> Unit,
+    onLeftDown: () -> Unit,
+    onLeftUp: () -> Unit,
+    onRightDown: () -> Unit,
+    onRightUp: () -> Unit,
+) {
+    GlassPanel(
+        isDark = isDark,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        modifier = modifier.fillMaxWidth(),
+        tint = if (isDark) Color(0xFF0E0F11) else Color(0xFFF0F1F3),
+        tintAlphaOverride = if (isDark) 0.55f else 0.75f,
+        hazeState = hazeState,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // 触控面:单指滑动=移动光标,双指滑动=滚轮
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.05f else 0.06f))
+                    .border(1.dp, GlassTokens.hairline(isDark), RoundedCornerShape(12.dp))
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var wheelAcc = 0f
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val pressed = event.changes.filter { it.pressed }
+                                    if (pressed.isEmpty()) break
+                                    if (pressed.size >= 2) {
+                                        // 双指竖滑 = 滚轮
+                                        val p = pressed[1]
+                                        val dy = p.position.y - p.previousPosition.y
+                                        wheelAcc += dy
+                                        if (abs(wheelAcc) >= 48f) {
+                                            val steps = (wheelAcc / 48f).toInt()
+                                            onWheel(-steps)
+                                            wheelAcc -= steps * 48f
+                                        }
+                                        pressed.forEach { it.consume() }
+                                    } else {
+                                        // 单指滑动 = 相对移动光标
+                                        val c = pressed[0]
+                                        val dx = c.position.x - c.previousPosition.x
+                                        val dy = c.position.y - c.previousPosition.y
+                                        if (dx != 0f || dy != 0f) {
+                                            onMove(dx, dy)
+                                            c.consume()
+                                        }
+                                    }
+                                }
+                            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                                throw e
+                            } catch (_: Throwable) {
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "触控区 · 滑动移动光标,双指滚动",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                )
+            }
+            // 物理左/右键:按住不放 + 触控面滑动 = 拖拽
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PadButton(
+                    label = "左键",
+                    isDark = isDark,
+                    onPress = onLeftDown,
+                    onRelease = onLeftUp,
+                    modifier = Modifier.weight(1.6f),
+                )
+                PadButton(
+                    label = "右键",
+                    isDark = isDark,
+                    onPress = onRightDown,
+                    onRelease = onRightUp,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** 触控板物理按键:按下=键按下,松开=键抬起(配合触控面滑动即拖拽)。 */
+@Composable
+private fun PadButton(
+    label: String,
+    isDark: Boolean,
+    onPress: () -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var pressed by remember { mutableStateOf(false) }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (pressed) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+            )
+            .border(1.dp, GlassTokens.hairline(isDark), RoundedCornerShape(10.dp))
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    pressed = true
+                    onPress()
+                    try {
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            if (e.changes.none { it.pressed }) break
+                        }
+                    } finally {
+                        pressed = false
+                        onRelease()
+                    }
+                }
+            },
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

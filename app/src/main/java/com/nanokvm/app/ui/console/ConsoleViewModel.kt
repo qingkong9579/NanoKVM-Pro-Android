@@ -33,6 +33,7 @@ data class ConsoleUiState(
     val reconnecting: Int? = null,
     val error: String? = null,
     val vkbVisible: Boolean = false,
+    val touchpadVisible: Boolean = false,
     val activeModifiers: Int = 0,
     val blurRadiusDp: Int = 16,  // 磨砂模糊半径
     val glassAlphaPct: Int = 24, // 磨砂 tint 强度(百分比)
@@ -72,7 +73,7 @@ data class StatsUi(
  * the web: buttons are re-stated with each move).
  */
 /** 控制台互斥面板:同一时间只开一个(高亮跟随)。 */
-enum class ConsolePanel { SETTINGS, TOOLS, STATS, KEYBOARD }
+enum class ConsolePanel { SETTINGS, TOOLS, STATS, KEYBOARD, TOUCHPAD }
 
 class ConsoleViewModel(
     host: String,
@@ -170,6 +171,7 @@ class ConsoleViewModel(
             toolsSheetOpen = panel == ConsolePanel.TOOLS,
             statsVisible = panel == ConsolePanel.STATS,
             vkbVisible = panel == ConsolePanel.KEYBOARD,
+            touchpadVisible = panel == ConsolePanel.TOUCHPAD,
         )
     }
 
