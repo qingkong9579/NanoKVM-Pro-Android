@@ -244,7 +244,33 @@ fun BoxScope.ConsoleToolsSheet(
             }
             if (!managePage) {
                 // ============ 操作:会话内操控 ============
-                // 电源操作置顶(用户指定):区头右侧挂 GPIO 电源状态灯(绿=开机 红=关机)
+                // 入口大卡(design S07):最高频动作上浮为彩色玻璃卡
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    EntryCard(
+                        icon = Icons.Outlined.Terminal,
+                        title = "终端",
+                        subtitle = "root shell · 串口",
+                        accent = Color(0xFF7BE7FF),
+                        onClick = {
+                            scope.launch {
+                                onOpenTerminal(com.nanokvm.app.ui.terminal.TerminalRequest(com.nanokvm.app.ui.terminal.TerminalKind.SHELL))
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    EntryCard(
+                        icon = Icons.Outlined.AutoAwesome,
+                        title = "智能助手",
+                        subtitle = "AI 看着屏幕执行键鼠任务",
+                        accent = OneKvmColors.SuccessBright,
+                        onClick = { scope.launch { showAssistant = true } },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // 电源操作:入口卡之下、其余工具之前;区头右侧挂 GPIO 电源状态灯(绿=开机 红=关机)
                 SectionHeader("电源 · 危险区", danger = true) { PowerStateBadge(state.powerOn) }
                 ToolRow(
                     icon = Icons.Outlined.PowerSettingsNew,
@@ -294,32 +320,6 @@ fun BoxScope.ConsoleToolsSheet(
                         ) { rest.gpioPower("reset", 800); kotlinx.coroutines.delay(2500); viewModel.refreshPowerState(); null }
                     },
                 )
-                // 入口大卡(design S07):最高频动作上浮为彩色玻璃卡
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    EntryCard(
-                        icon = Icons.Outlined.Terminal,
-                        title = "终端",
-                        subtitle = "root shell · 串口",
-                        accent = Color(0xFF7BE7FF),
-                        onClick = {
-                            scope.launch {
-                                onOpenTerminal(com.nanokvm.app.ui.terminal.TerminalRequest(com.nanokvm.app.ui.terminal.TerminalKind.SHELL))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    EntryCard(
-                        icon = Icons.Outlined.AutoAwesome,
-                        title = "智能助手",
-                        subtitle = "AI 看着屏幕执行键鼠任务",
-                        accent = OneKvmColors.SuccessBright,
-                        onClick = { scope.launch { showAssistant = true } },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
                 SectionHeader("常用")
                 ToolRow(
                     icon = Icons.Outlined.Usb,
