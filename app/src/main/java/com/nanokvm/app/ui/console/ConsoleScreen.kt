@@ -135,6 +135,17 @@ fun ConsoleScreen(
         viewModel.start()
     }
 
+    // 电源状态灯(web 电源按钮同源):建流后每 5s 轮询 /api/vm/gpio 的 pwr,悬浮徽标展示
+    LaunchedEffect(state.phase == Phase.STREAMING) {
+        if (state.phase == Phase.STREAMING) {
+            viewModel.refreshPowerState()
+            while (true) {
+                kotlinx.coroutines.delay(5000)
+                viewModel.refreshPowerState()
+            }
+        }
+    }
+
     val hazeState = remember { HazeState() }
     var statsDock by rememberSaveable { mutableStateOf(false) }
     // S03 结构(design-v2):顶部 chrome / 中部视频(haze 采样源)/ 底部键盘,三段分明
@@ -151,6 +162,14 @@ fun ConsoleScreen(
                 VideoStage(state, viewModel)
             }
             StageOverlays(state, viewModel)
+            PowerBadge(
+                powerOn = state.powerOn,
+                isDark = isDark,
+                hazeState = hazeState,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 10.dp, start = 12.dp),
+            )
             if (state.phase == Phase.CONNECTING) FlowLine(Modifier.align(Alignment.TopCenter).fillMaxWidth())
             if (state.statsVisible && !statsDock) {
                 Row(
@@ -335,6 +354,41 @@ private fun TopBar(
                 )
             }
         }
+    }
+}
+
+/** 电源状态徽标:圆角矩形悬浮于工具栏下方,LED 点 绿=开机 红=关机 灰=未知(GET /api/vm/gpio 的 pwr)。 */
+@Composable
+private fun PowerBadge(
+    powerOn: Boolean?,
+    isDark: Boolean,
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+) {
+    val led = when (powerOn) {
+        true -> Color(0xFF16A34A)   // web text-green-600
+        false -> Color(0xFFDC2626)  // 关机红
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .glassFrost(hazeState, isDark)
+            .border(1.dp, GlassTokens.hairline(isDark), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(led))
+        Text(
+            when (powerOn) {
+                true -> "已开机"
+                false -> "已关机"
+                null -> "电源状态…"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

@@ -15,6 +15,7 @@
 - 磨砂玻璃体系 v0.1.4(haze 1.2.2,MIT):控制台改沉浸式布局(视频全屏铺满,顶栏/工具条/键盘/性能 dock/设置面板以磨砂玻璃悬浮于视频上,实时透出画面);设置 Sheet 新增「磨砂玻璃」模糊度(4–40dp)/透明度(5–80%)滑杆,实时预览、DataStore 持久化;工具箱二级参数行优化(ToolParamRow:图标+标题+右侧当前值+内嵌分段)
 - v0.1.5:按 design-v2(设计文件.sketch)对齐 UI——登录页居中品牌卡+已保存芯片+外置标签;控制台 S03 三段结构(玻璃 chrome/画面/底部面板),磨砂胶囊操作栏(独占面板,激活胶囊青色高亮,横向可滚动);**模拟触控板面板**(触控区相对移动+双指滚动+物理左/右键);键盘/触控板 navigationBarsPadding 避开系统手势条;工具箱终端/智能助手入口卡+设备管理健康组;S13 确认壳层(参数摘要+警告+红色执行)
 - v0.1.6 重要修复:①**触控板在绝对鼠标模式下无响应**——HidHost.mouseRelativeMove 的 `if (!isRelative) return` UX gate 把触控板移动静默丢弃;新增 touchpadMove/Button/Wheel 强制相对报文通路(设备 HID WS 同时接受绝对 6B/相对 4B,无需切模式)。②**断线重连随机失败**(设备返回 "set rate control failed" code -3)——设备流会话活跃/收尾窗口会拒绝流参数写入;connect() 记录 configuredMode,模式未变跳过 configureStream,参数写入容忍失败,applyStreamParams 加单次退避重试。排查手段:trust-all 前提下用 python MITM(CONNECT 隧道)抓 OkHttp 明文请求对比裸调
+- 电源状态灯(对齐 web 电源按钮):`GET /api/vm/gpio` 的 `data.pwr`(true=开机绿 false=关机红)为唯一信号源;控制台工具栏下方悬浮磨砂圆角徽标(建流后每 5s 轮询),工具箱电源区置顶且区头挂同一状态灯,电源操作后延迟 2.5s 刷新。web 源码参照 NanoKVM-Pro/web/src/pages/desktop/menu/power/index.tsx(getGpio 5s 轮询,text-green-600)
 - 曾试验 AndroidLiquidGlassView(AGSL 折射透镜)并 vendor 其源码,因「透镜必然位于被采样 content 内」造成 RenderNode 自引用递归(RednerThread 栈溢出,需录制期全局抑制+去硬件层才可稳定),且多透镜经共享树仍会互指——已整体移除,统一用 haze 方案
 - 视觉打磨(v0.1.3,按 `.workbench/spec.md` 令牌):全局排版刻度(标题15sp/500·正文13sp·次要12sp)、性能/监控曲线渐变填充+实时端点+圆角线帽、工具箱行图标底座(32dp/8dp 圆角)、虚拟键盘等宽键块、图标统一 20dp/40dp 命中区、连接页点阵满屏+卡片描边阴影
 

@@ -45,6 +45,7 @@ data class ConsoleUiState(
     val videoRotation: Int = 0,       // 0/90/180/270 (web rotation menu; client-side view)
     val videoScale: Float = 1f,       // 0.5..2 zoom (web scale menu; client-side view)
     val wheelDir: Int = 1,            // 滚轮方向乘数 (web direction ±1)
+    val powerOn: Boolean? = null,     // 被控机电源状态(web 电源按钮颜色同源:GET /api/vm/gpio 的 pwr;null=未知)
 ) {
     val videoFormatKnown: Boolean get() = videoWidth > 0 && videoHeight > 0
 }
@@ -433,6 +434,20 @@ class ConsoleViewModel(
     fun touchpadMove(dxPx: Float, dyPx: Float) = hidHost?.touchpadMove(dxPx, dyPx)
     fun touchpadButton(button: Int, down: Boolean) = hidHost?.touchpadButton(button, down)
     fun touchpadWheel(ticks: Int) = hidHost?.touchpadWheel(ticks * _state.value.wheelDir)
+
+    /**
+     * 被控机电源状态(web 电源按钮红/绿同源):GET /api/vm/gpio 的 data.pwr。
+     * 失败时保持上次已知值;工具箱打开期间每 5s 轮询一次(web 同间隔)。
+     */
+    fun refreshPowerState() {
+        viewModelScope.launch {
+            try {
+                val on = session.restApi.gpioState().pwr
+                _state.value = _state.value.copy(powerOn = on)
+            } catch (_: Exception) {
+            }
+        }
+    }
     fun sendCombo(modifiers: Int, usages: List<Int>) = hidHost?.combo(modifiers, usages)
 
     /** 设备端逐字符粘贴(web paste:POST /api/hid/paste,≤1024)。 */

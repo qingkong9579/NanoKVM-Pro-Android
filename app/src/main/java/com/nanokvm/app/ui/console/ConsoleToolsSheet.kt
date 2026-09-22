@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -243,6 +244,56 @@ fun BoxScope.ConsoleToolsSheet(
             }
             if (!managePage) {
                 // ============ 操作:会话内操控 ============
+                // 电源操作置顶(用户指定):区头右侧挂 GPIO 电源状态灯(绿=开机 红=关机)
+                SectionHeader("电源 · 危险区", danger = true) { PowerStateBadge(state.powerOn) }
+                ToolRow(
+                    icon = Icons.Outlined.PowerSettingsNew,
+                    title = "电源键短按",
+                    subtitle = "模拟一次电源键短按(800ms)",
+                    danger = true,
+                    onClick = {
+                        confirm(
+                            "电源键短按",
+                            "模拟一次物理电源键短按。",
+                            listOf("操作" to "power · press 800ms"),
+                        ) { rest.gpioPower("power", 800); kotlinx.coroutines.delay(2500); viewModel.refreshPowerState(); null }
+                    },
+                )
+                ToolRow(
+                    icon = Icons.Outlined.PowerSettingsNew,
+                    title = "电源键长按",
+                    subtitle = "长按 ${longSeconds}s(强制关机)",
+                    danger = true,
+                    trailing = {
+                        Column(Modifier.width(120.dp)) {
+                            Slider(
+                                value = longSeconds.toFloat(), onValueChange = { longSeconds = it.roundToInt() },
+                                valueRange = 1f..30f,
+                            )
+                            Text("${longSeconds}s", style = MaterialTheme.typography.labelSmall)
+                        }
+                    },
+                    onClick = {
+                        confirm(
+                            "电源键长按",
+                            "被控机将强制关机,未保存的工作可能丢失。",
+                            listOf("操作" to "power · long-press", "时长" to "${longSeconds}s"),
+                        ) { rest.gpioPower("power", longSeconds * 1000); kotlinx.coroutines.delay(2500); viewModel.refreshPowerState(); null }
+                    },
+                )
+                ToolRow(
+                    icon = Icons.Outlined.Refresh,
+                    title = "重启(被控机复位)",
+                    subtitle = "reset 键按下 800ms 复位主机",
+                    danger = true,
+                    onClick = {
+                        confirm(
+                            "重启被控机",
+                            "reset 键按下 800ms,主机将立即重启。",
+                            listOf("操作" to "reset · press 800ms"),
+                        ) { rest.gpioPower("reset", 800); kotlinx.coroutines.delay(2500); viewModel.refreshPowerState(); null }
+                    },
+                )
                 // 入口大卡(design S07):最高频动作上浮为彩色玻璃卡
                 Row(
                     Modifier.fillMaxWidth().padding(top = 2.dp),
@@ -456,55 +507,6 @@ fun BoxScope.ConsoleToolsSheet(
                         }
                     },
                 )
-                SectionHeader("电源 · 危险区", danger = true)
-                ToolRow(
-                    icon = Icons.Outlined.PowerSettingsNew,
-                    title = "电源键短按",
-                    subtitle = "模拟一次电源键短按(800ms)",
-                    danger = true,
-                    onClick = {
-                        confirm(
-                            "电源键短按",
-                            "模拟一次物理电源键短按。",
-                            listOf("操作" to "power · press 800ms"),
-                        ) { rest.gpioPower("power", 800).let { null } }
-                    },
-                )
-                ToolRow(
-                    icon = Icons.Outlined.PowerSettingsNew,
-                    title = "电源键长按",
-                    subtitle = "长按 ${longSeconds}s(强制关机)",
-                    danger = true,
-                    trailing = {
-                        Column(Modifier.width(120.dp)) {
-                            Slider(
-                                value = longSeconds.toFloat(), onValueChange = { longSeconds = it.roundToInt() },
-                                valueRange = 1f..30f,
-                            )
-                            Text("${longSeconds}s", style = MaterialTheme.typography.labelSmall)
-                        }
-                    },
-                    onClick = {
-                        confirm(
-                            "电源键长按",
-                            "被控机将强制关机,未保存的工作可能丢失。",
-                            listOf("操作" to "power · long-press", "时长" to "${longSeconds}s"),
-                        ) { rest.gpioPower("power", longSeconds * 1000).let { null } }
-                    },
-                )
-                ToolRow(
-                    icon = Icons.Outlined.Refresh,
-                    title = "重启(被控机复位)",
-                    subtitle = "reset 键按下 800ms 复位主机",
-                    danger = true,
-                    onClick = {
-                        confirm(
-                            "重启被控机",
-                            "reset 键按下 800ms,主机将立即重启。",
-                            listOf("操作" to "reset · press 800ms"),
-                        ) { rest.gpioPower("reset", 800).let { null } }
-                    },
-                )
             } else {
                 // ============ 设备管理:设备级配置 ============
                 SectionHeader("健康")
@@ -679,15 +681,54 @@ fun BoxScope.ConsoleToolsSheet(
 // ---------- shared bits ----------
 
 @Composable
-private fun SectionHeader(title: String, danger: Boolean = false) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelMedium,
-        color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+private fun SectionHeader(
+    title: String,
+    danger: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp, bottom = 2.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.weight(1f))
+        trailing?.invoke()
+    }
+}
+
+/** 电源状态灯:LED 点 绿=开机 红=关机 灰=未知(GET /api/vm/gpio 的 pwr,与 web 电源按钮同源)。 */
+@Composable
+private fun PowerStateBadge(powerOn: Boolean?) {
+    val led = when (powerOn) {
+        true -> Color(0xFF16A34A)   // web text-green-600
+        false -> Color(0xFFDC2626)  // 关机红
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(led))
+        Text(
+            when (powerOn) {
+                true -> "已开机"
+                false -> "已关机"
+                null -> "状态未知"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
